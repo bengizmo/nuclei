@@ -1,8 +1,12 @@
 # Test targets for local development
-# Add accessible targets from your current network
+# Currently on Clients VLAN (192.168.6.0/24)
 localhost
 127.0.0.1
-# Add any accessible hosts from your current network
-# For example, if you're on the default VLAN:
-# 192.168.10.1  # Router (if accessible)
-# 192.168.10.249  # Think Tank (if accessible)
+192.168.6.1   # Router gateway for Clients VLAN
+192.168.6.36  # Current machine (self)
+
+# Accessible critical infrastructure from Clients VLAN
+192.168.10.1  # UDM PRO Router
+192.168.10.89 # Home Assistant
+192.168.10.249 # Think Tank (Ubuntu Dev Server)
+192.168.10.163 # NAS1 (Synology)
