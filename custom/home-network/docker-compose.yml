@@ -5,15 +5,12 @@ version: '3.8'
 
 services:
   nuclei:
-    image: projectdiscovery/nuclei:latest
+    build: .
     container_name: nuclei-scanner
     cap_add:
       - NET_ADMIN  # Required for multiple VLANs
-    privileged: true  # May be needed for VLAN access
     volumes:
-      - ./templates:/home/nuclei/nuclei-templates
       - ./results:/home/nuclei/results
-      - ./config:/home/nuclei/.config/nuclei
       - ./scripts:/home/nuclei/scripts
       - ./critical-hosts.txt:/home/nuclei/critical-hosts.txt:ro
     environment:
@@ -30,7 +27,7 @@ services:
       vlan_clients:
         ipv4_address: 192.168.6.200
     restart: unless-stopped
-    command: /home/nuclei/scripts/ha-webhook-update.sh
+    command: tail -f /dev/null
 
 networks:
   vlan_default:

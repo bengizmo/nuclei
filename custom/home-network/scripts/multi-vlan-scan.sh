@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # multi-vlan-scan.sh - Comprehensive multi-VLAN scanning script
 
 SCAN_DATE=$(date +%Y%m%d-%H%M%S)
@@ -7,57 +7,52 @@ mkdir -p "$RESULTS_DIR"
 
 # Function to update Home Assistant
 update_home_assistant() {
-    curl -X POST \
-      -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"state\": \"$1\", \"attributes\": {\"last_scan\": \"${SCAN_DATE}\", \"status\": \"$2\", \"findings\": $3}}" \
-      http://192.168.10.89:8123/api/states/sensor.nuclei_scanner
+    # TODO: Add Home Assistant integration
+    echo "Status: $1 - $2"
 }
 
 # Start scan notification
 update_home_assistant "scanning" "Running multi-VLAN scan" 0
 
 # Scan each VLAN
-VLANS=("192.168.10.0/24:default" "192.168.14.0/24:iot" "192.168.5.0/24:guest" "192.168.6.0/24:clients")
+VLANS="192.168.10.0/24:default 192.168.14.0/24:iot 192.168.5.0/24:guest 192.168.6.0/24:clients"
 
-for vlan in "${VLANS[@]}"; do
-    IFS=':' read -r subnet name <<< "$vlan"
+for vlan in $VLANS; do
+    subnet=$(echo $vlan | cut -d: -f1)
+    name=$(echo $vlan | cut -d: -f2)
     echo "Scanning $name VLAN: $subnet"
     
     nuclei -target "$subnet" \
            -o "$RESULTS_DIR/scan-$name.json" \
-           -json \
-           -severity medium,high,critical \
-           -tags network,cve,router,iot,exposed-panels,default-logins \
-           -stats-json \
-           -si 30 \
-           -exclude-hosts "192.168.10.163" # Exclude self (NAS)
+           -j \
+           -s medium,high,critical \
+           -t network/ -t cve/ -t exposed-panels/ -t default-logins/ \
+           -si 30
 done
 
 # Scan critical infrastructure with enhanced checks
-nuclei -list /home/nuclei/critical-hosts.txt \
+nuclei -l /home/nuclei/critical-hosts.txt \
        -o "$RESULTS_DIR/critical-infrastructure.json" \
-       -json \
-       -severity low,medium,high,critical \
-       -t network/ -t ssl/ -t exposed-panels/ -t default-logins/ \
-       -stats-json
+       -j \
+       -s low,medium,high,critical \
+       -t network/ -t ssl/ -t exposed-panels/ -t default-logins/
 
 # Compile results and check for findings
-FINDINGS=$(jq -s '[.[] | select(.info.severity == "critical" or .info.severity == "high")] | length' "$RESULTS_DIR"/*.json 2>/dev/null || echo 0)
+echo "Scan completed at $SCAN_DATE" > "$RESULTS_DIR/summary.txt"
+echo "Results available in: $RESULTS_DIR" >> "$RESULTS_DIR/summary.txt"
 
-if [ "$FINDINGS" -gt 0 ]; then
-    update_home_assistant "alert" "Found $FINDINGS vulnerabilities" "$FINDINGS"
-    # Send notification to Home Assistant
-    curl -X POST \
-      -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"message\": \"Nuclei scan completed: $FINDINGS high/critical vulnerabilities found\", \"title\": \"Security Alert\"}" \
-      http://192.168.10.89:8123/api/services/notify/notify
+# Count JSON files
+JSON_COUNT=$(find "$RESULTS_DIR" -name "*.json" | wc -l)
+echo "Generated $JSON_COUNT result files" >> "$RESULTS_DIR/summary.txt"
+
+# Simple check for findings
+if grep -l "severity" "$RESULTS_DIR"/*.json 2>/dev/null; then
+    update_home_assistant "alert" "Found vulnerabilities" "1"
+    echo "Vulnerabilities found - check JSON files for details" >> "$RESULTS_DIR/summary.txt"
 else
-    update_home_assistant "ok" "No vulnerabilities found" 0
+    update_home_assistant "ok" "No vulnerabilities found" "0"
+    echo "No vulnerabilities found" >> "$RESULTS_DIR/summary.txt"
 fi
 
-# Generate summary report
-echo "Scan completed at $SCAN_DATE" > "$RESULTS_DIR/summary.txt"
-echo "Total high/critical findings: $FINDINGS" >> "$RESULTS_DIR/summary.txt"
-cat "$RESULTS_DIR"/*.json | jq -r '.info.severity' | sort | uniq -c >> "$RESULTS_DIR/summary.txt"
+# Create a latest symlink
+ln -sf "$RESULTS_DIR" "/home/nuclei/results/latest"

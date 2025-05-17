@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # local-test-scan.sh - Test script for local development
 
 echo "Running Nuclei in local test mode..."
