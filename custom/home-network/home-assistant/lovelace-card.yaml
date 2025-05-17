@@ -1,0 +1,111 @@
+# Lovelace Dashboard Card for Nuclei Scanner
+# Add this to your Home Assistant dashboard
+
+type: vertical-stack
+cards:
+  - type: custom:mushroom-template-card
+    primary: Network Security Scanner
+    secondary: >
+      {% set status = states('sensor.nuclei_scanner') %}
+      {% if status == 'scanning' %}
+        Scan in progress...
+      {% elif status == 'alert' %}
+        ⚠️ {{ state_attr('sensor.nuclei_scanner', 'findings') }} issues found
+      {% else %}
+        Last scan: {{ relative_time(state_attr('sensor.nuclei_scanner', 'last_scan') | as_datetime) }} ago
+      {% endif %}
+    icon: mdi:shield-search
+    icon_color: >
+      {% set status = states('sensor.nuclei_scanner') %}
+      {% if status == 'alert' %}
+        red
+      {% elif status == 'scanning' %}
+        blue
+      {% else %}
+        green
+      {% endif %}
+    tap_action:
+      action: call-service
+      service: script.run_nuclei_scan
+    hold_action:
+      action: more-info
+
+  - type: entities
+    entities:
+      - type: custom:template-entity-row
+        name: Container Status
+        state: "{{ states('sensor.nuclei_container_status') }}"
+        icon: >
+          {% if is_state('sensor.nuclei_container_status', 'running') %}
+            mdi:docker
+          {% else %}
+            mdi:docker-off
+          {% endif %}
+      
+      - type: divider
+      
+      - entity: sensor.nuclei_scanner
+        type: attribute
+        attribute: last_scan
+        name: Last Scan
+        format: datetime
+      
+      - type: custom:multiple-entity-row
+        entity: sensor.nuclei_scanner
+        name: Findings
+        state_header: Total
+        entities:
+          - attribute: critical
+            name: Critical
+            styles:
+              text-color: red
+          - attribute: high
+            name: High
+            styles:
+              text-color: orange
+
+  - type: horizontal-stack
+    cards:
+      - type: button
+        tap_action:
+          action: call-service
+          service: script.run_nuclei_scan
+        name: Run Scan
+        icon: mdi:play
+        icon_height: 40px
+      
+      - type: button
+        tap_action:
+          action: navigate
+          navigation_path: /config/logs
+        name: View Logs
+        icon: mdi:text-box-outline
+        icon_height: 40px
+
+# Alternative simple version without custom cards
+type: vertical-stack
+cards:
+  - type: entity
+    entity: sensor.nuclei_scanner
+    name: Security Scanner
+    
+  - type: glance
+    entities:
+      - entity: sensor.nuclei_scanner
+        name: Status
+      - entity: sensor.nuclei_scanner
+        name: Findings
+        attribute: findings
+      - entity: sensor.nuclei_scanner
+        name: Critical
+        attribute: critical
+      - entity: sensor.nuclei_scanner
+        name: High
+        attribute: high
+    
+  - type: button
+    name: Run Security Scan
+    tap_action:
+      action: call-service
+      service: script.run_nuclei_scan
+    icon: mdi:shield-search

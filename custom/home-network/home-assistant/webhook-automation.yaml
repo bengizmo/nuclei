@@ -1,0 +1,49 @@
+# Home Assistant Webhook Configuration for Nuclei
+# Add this to your automations.yaml
+
+- id: nuclei_webhook_receiver
+  alias: "Nuclei Scan Webhook Receiver"
+  trigger:
+    - platform: webhook
+      webhook_id: nuclei_scan_update
+  action:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.nuclei_status
+      data:
+        value: "{{ trigger.json.status }}"
+    
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.nuclei_findings
+      data:
+        value: "{{ trigger.json.findings }}"
+    
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.nuclei_critical
+      data:
+        value: "{{ trigger.json.critical }}"
+    
+    - service: input_number.set_value
+      target:
+        entity_id: input_number.nuclei_high
+      data:
+        value: "{{ trigger.json.high }}"
+    
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.nuclei_last_scan
+      data:
+        datetime: "{{ trigger.json.scan_time }}"
+    
+    - condition: template
+      value_template: "{{ trigger.json.status == 'alert' }}"
+    
+    - service: notify.notify
+      data:
+        title: "Security Alert!"
+        message: >
+          Nuclei found {{ trigger.json.findings }} vulnerabilities:
+          - Critical: {{ trigger.json.critical }}
+          - High: {{ trigger.json.high }}

@@ -30,7 +30,7 @@ services:
       vlan_clients:
         ipv4_address: 192.168.6.200
     restart: unless-stopped
-    command: /home/nuclei/scripts/multi-vlan-scan.sh
+    command: /home/nuclei/scripts/ha-webhook-update.sh
 
 networks:
   vlan_default:

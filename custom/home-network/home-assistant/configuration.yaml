@@ -1,0 +1,137 @@
+# Nuclei Scanner Integration for Home Assistant
+# Add this to your Home Assistant configuration.yaml
+
+# Input helpers for storing scan state
+input_text:
+  nuclei_status:
+    name: Nuclei Scanner Status
+    initial: idle
+    icon: mdi:shield-search
+
+input_datetime:
+  nuclei_last_scan:
+    name: Last Nuclei Scan
+    has_date: true
+    has_time: true
+
+input_number:
+  nuclei_findings:
+    name: Total Findings
+    min: 0
+    max: 999
+    step: 1
+    icon: mdi:alert-circle
+  nuclei_critical:
+    name: Critical Findings
+    min: 0
+    max: 999
+    step: 1
+    icon: mdi:alert-octagon
+  nuclei_high:
+    name: High Findings
+    min: 0
+    max: 999
+    step: 1
+    icon: mdi:alert
+
+# Command line sensor to check if container is running
+sensor:
+  - platform: command_line
+    name: Nuclei Container Status
+    command: "ssh nas@192.168.10.163 'docker ps --format table --filter name=nuclei-scanner' | grep -q nuclei-scanner && echo 'running' || echo 'stopped'"
+    scan_interval: 300  # Check every 5 minutes
+
+# Template sensor for combined status
+template:
+  - sensor:
+      - name: "Nuclei Scanner"
+        state: "{{ states('input_text.nuclei_status') }}"
+        attributes:
+          last_scan: "{{ states('input_datetime.nuclei_last_scan') }}"
+          findings: "{{ states('input_number.nuclei_findings') | int }}"
+          critical: "{{ states('input_number.nuclei_critical') | int }}"
+          high: "{{ states('input_number.nuclei_high') | int }}"
+          container_status: "{{ states('sensor.nuclei_container_status') }}"
+        icon: >
+          {% if is_state('input_text.nuclei_status', 'alert') %}
+            mdi:shield-alert
+          {% elif is_state('input_text.nuclei_status', 'scanning') %}
+            mdi:shield-sync
+          {% else %}
+            mdi:shield-check
+          {% endif %}
+
+# Shell commands for scanner control
+shell_command:
+  nuclei_start_scan: >
+    ssh nas@192.168.10.163 
+    'docker exec nuclei-scanner /home/nuclei/scripts/multi-vlan-scan.sh'
+  
+  nuclei_check_results: >
+    ssh nas@192.168.10.163 
+    'docker exec nuclei-scanner cat /home/nuclei/results/latest/summary.txt'
+
+# Automations
+automation:
+  - id: nuclei_daily_scan
+    alias: "Nuclei Daily Security Scan"
+    trigger:
+      - platform: time
+        at: "03:00:00"
+    action:
+      - service: shell_command.nuclei_start_scan
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.nuclei_status
+        data:
+          value: "scanning"
+      
+  - id: nuclei_scan_complete
+    alias: "Nuclei Scan Complete"
+    trigger:
+      - platform: state
+        entity_id: input_text.nuclei_status
+        from: "scanning"
+        to: "idle"
+      - platform: state
+        entity_id: input_text.nuclei_status
+        from: "scanning"
+        to: "alert"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.nuclei_last_scan
+        data:
+          datetime: "{{ now() }}"
+      
+  - id: nuclei_alert_notification
+    alias: "Nuclei Security Alert"
+    trigger:
+      - platform: state
+        entity_id: input_text.nuclei_status
+        to: "alert"
+    action:
+      - service: notify.notify
+        data:
+          title: "🚨 Security Alert"
+          message: >
+            Nuclei scan found {{ states('input_number.nuclei_findings') }} vulnerabilities!
+            Critical: {{ states('input_number.nuclei_critical') }}
+            High: {{ states('input_number.nuclei_high') }}
+          data:
+            priority: high
+
+# Scripts for manual control
+script:
+  run_nuclei_scan:
+    alias: "Run Nuclei Scan"
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.nuclei_status
+        data:
+          value: "scanning"
+      - service: shell_command.nuclei_start_scan
+      - service: notify.notify
+        data:
+          message: "Security scan started"
