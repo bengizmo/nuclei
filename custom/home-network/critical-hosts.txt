@@ -1,0 +1,14 @@
+# Critical Infrastructure Targets for Home Network Scanning
+
+# Network Infrastructure
+192.168.10.1    # UDM PRO (Main Router/Firewall)
+192.168.10.156  # Ubiquiti AP 1
+192.168.10.50   # Ubiquiti AP 2
+192.168.10.7    # Ubiquiti AP 3
+192.168.10.130  # Ubiquiti AP 4
+
+# Servers
+192.168.10.249  # Think Tank (Ubuntu Dev Server - Docker/Ollama)
+192.168.10.251  # RBHome Ubuntu (Media Server - Plex/Sonarr/Radarr)
+192.168.10.89   # Home Assistant (Raspberry Pi)
+192.168.10.163  # NAS1 (Synology - Nuclei Host)

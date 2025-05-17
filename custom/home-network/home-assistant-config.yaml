@@ -1,0 +1,64 @@
+# Home Assistant Configuration for Nuclei Scanner
+# Add this to your configuration.yaml
+
+sensor:
+  - platform: template
+    sensors:
+      nuclei_scanner:
+        friendly_name: "Nuclei Security Scanner"
+        value_template: "{{ states('input_text.nuclei_status') }}"
+        attribute_templates:
+          last_scan: "{{ states('input_datetime.nuclei_last_scan') }}"
+          findings_count: "{{ states('input_number.nuclei_findings') | int }}"
+          critical_count: "{{ states('input_number.nuclei_critical') | int }}"
+          high_count: "{{ states('input_number.nuclei_high') | int }}"
+
+input_text:
+  nuclei_status:
+    name: Nuclei Status
+    initial: idle
+
+input_datetime:
+  nuclei_last_scan:
+    name: Last Nuclei Scan
+    has_date: true
+    has_time: true
+
+input_number:
+  nuclei_findings:
+    name: Nuclei Findings
+    min: 0
+    max: 999
+    step: 1
+  nuclei_critical:
+    name: Critical Findings
+    min: 0
+    max: 999
+    step: 1
+  nuclei_high:
+    name: High Findings
+    min: 0
+    max: 999
+    step: 1
+
+automation:
+  - alias: "Nuclei Daily Scan"
+    trigger:
+      - platform: time
+        at: "03:00:00"
+    action:
+      - service: shell_command.run_nuclei_scan
+      
+  - alias: "Nuclei Alert Notification"
+    trigger:
+      - platform: state
+        entity_id: sensor.nuclei_scanner
+        to: "alert"
+    action:
+      - service: notify.notify
+        data:
+          title: "Security Alert"
+          message: "Nuclei found {{ state_attr('sensor.nuclei_scanner', 'findings_count') }} vulnerabilities!"
+
+shell_command:
+  run_nuclei_scan: 'ssh nas@192.168.10.163 "docker exec nuclei-scanner /home/nuclei/scripts/multi-vlan-scan.sh"'
