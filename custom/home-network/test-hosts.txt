@@ -1,0 +1,8 @@
+# Test targets for local development
+# Add accessible targets from your current network
+localhost
+127.0.0.1
+# Add any accessible hosts from your current network
+# For example, if you're on the default VLAN:
+# 192.168.10.1  # Router (if accessible)
+# 192.168.10.249  # Think Tank (if accessible)

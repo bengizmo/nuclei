@@ -1,0 +1,22 @@
+# Local testing configuration for development
+# This uses host networking and scans only accessible targets
+
+version: '3.8'
+
+services:
+  nuclei-local:
+    image: projectdiscovery/nuclei:latest
+    container_name: nuclei-scanner-local
+    network_mode: host  # Use host network for local testing
+    volumes:
+      - ./templates:/home/nuclei/nuclei-templates
+      - ./results:/home/nuclei/results
+      - ./config:/home/nuclei/.config/nuclei
+      - ./scripts:/home/nuclei/scripts
+      - ./test-hosts.txt:/home/nuclei/test-hosts.txt:ro
+    environment:
+      - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
+      - PDCP_API_KEY=${PDCP_API_KEY}
+      - OLLAMA_API=http://192.168.10.249:11434/v1
+      - LOCAL_TEST=true
+    command: /home/nuclei/scripts/local-test-scan.sh
