@@ -1,0 +1,212 @@
+# Network Discovery Dashboard for Home Assistant
+type: vertical-stack
+title: Network Discovery & Security
+cards:
+  # Main discovery status
+  - type: custom:mushroom-entity-card
+    entity: sensor.nuclei_network_discovery
+    name: Network Discovery
+    icon: mdi:lan
+    icon_color: blue
+    primary_info: name
+    secondary_info: state
+    tap_action:
+      action: more-info
+
+  # Device statistics
+  - type: custom:mini-graph-card
+    name: Network Devices
+    entities:
+      - entity: sensor.nuclei_network_discovery
+        attribute: online_devices
+        name: Online
+      - entity: sensor.nuclei_network_discovery  
+        attribute: total_devices
+        name: Total
+    hours_to_show: 24
+    points_per_hour: 12
+    line_width: 2
+    color_thresholds:
+      - value: 50
+        color: "#28a745"
+      - value: 100
+        color: "#ffc107"
+      - value: 150
+        color: "#dc3545"
+
+  # Device type breakdown
+  - type: entities
+    title: Device Types
+    entities:
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: linux_servers
+        name: Linux Servers
+        icon: mdi:server
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: windows_hosts
+        name: Windows Hosts
+        icon: mdi:microsoft-windows
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: cameras
+        name: Cameras
+        icon: mdi:cctv
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: network_devices
+        name: Network Equipment
+        icon: mdi:router
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: apple_devices
+        name: Apple Devices
+        icon: mdi:apple
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: iot_devices
+        name: IoT Devices
+        icon: mdi:chip
+      - type: attribute
+        entity: sensor.nuclei_network_discovery
+        attribute: unknown_devices
+        name: Unknown
+        icon: mdi:help-circle
+
+  # VLAN distribution
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_vlan_default
+        name: Default VLAN
+        icon: mdi:lan
+        icon_color: green
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_vlan_iot
+        name: IoT VLAN
+        icon: mdi:chip
+        icon_color: blue
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_vlan_guest
+        name: Guest VLAN
+        icon: mdi:account-multiple
+        icon_color: yellow
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_vlan_clients
+        name: Clients VLAN
+        icon: mdi:laptop
+        icon_color: purple
+
+  # Recent discoveries
+  - type: markdown
+    title: Recent Discoveries
+    content: |
+      {% set discoveries = state_attr('sensor.nuclei_network_discovery', 'recent_discoveries') %}
+      {% if discoveries %}
+        {% for discovery in discoveries.split(';') %}
+          {% if discovery %}
+      - {{ discovery }}
+          {% endif %}
+        {% endfor %}
+      {% else %}
+      No new devices in the last 24 hours
+      {% endif %}
+
+  # New device alerts
+  - type: conditional
+    conditions:
+      - entity: sensor.nuclei_new_device_alert
+        state_not: unavailable
+    card:
+      type: custom:mushroom-entity-card
+      entity: sensor.nuclei_new_device_alert
+      name: New Device Alert
+      icon: mdi:alert
+      icon_color: red
+      tap_action:
+        action: more-info
+
+  # Device discovery summary (AI)
+  - type: conditional
+    conditions:
+      - entity: sensor.nuclei_device_discovery_summary
+        state_not: unavailable
+    card:
+      type: markdown
+      title: Latest Device Analysis
+      content: |
+        {{ states('sensor.nuclei_device_discovery_summary') }}
+        
+        **Device:** {{ state_attr('sensor.nuclei_device_discovery_summary', 'device_ip') }}
+        **Type:** {{ state_attr('sensor.nuclei_device_discovery_summary', 'device_type') }}
+        **Vulnerabilities:** {{ state_attr('sensor.nuclei_device_discovery_summary', 'vulnerabilities') }}
+
+  # Manual scan buttons
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Force Discovery
+        icon: mdi:refresh
+        tap_action:
+          action: call-service
+          service: shell_command.force_network_discovery
+      - type: button
+        name: View Logs
+        icon: mdi:text-box
+        tap_action:
+          action: call-service
+          service: shell_command.view_discovery_logs
+
+# Shell commands
+shell_command:
+  force_network_discovery: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner killall -USR1 network-discovery.sh"'
+  view_discovery_logs: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner tail -n 50 /home/nuclei/logs/discovery.log"'
+
+# Automations for network discovery
+automation:
+  - alias: "New Device Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.nuclei_new_device_alert
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "🆕 New Device Detected"
+          message: |
+            {{ state_attr('sensor.nuclei_new_device_alert', 'device_type') }} at {{ state_attr('sensor.nuclei_new_device_alert', 'device_ip') }}
+            OS: {{ state_attr('sensor.nuclei_new_device_alert', 'os') }}
+            VLAN: {{ state_attr('sensor.nuclei_new_device_alert', 'vlan') }}
+            Vulnerabilities: {{ state_attr('sensor.nuclei_new_device_alert', 'vulnerabilities') }}
+          data:
+            push:
+              sound:
+                name: "notification.caf"
+              category: "device_alert"
+              
+  - alias: "Unknown Device Warning"
+    trigger:
+      - platform: numeric_state
+        entity_id: sensor.nuclei_network_discovery
+        attribute: unknown_devices
+        above: 0
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "⚠️ Unknown Device(s) Detected"
+          message: |
+            {{ state_attr('sensor.nuclei_network_discovery', 'unknown_devices') }} unknown device(s) found on network.
+            Review and profile these devices for security.
+
+  - alias: "Update Discovery Dashboard"
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"  # Every 5 minutes
+    action:
+      - service: shell_command.update_discovery_stats
+
+shell_command:
+  update_discovery_stats: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner sh /home/nuclei/scripts/discovery-dashboard-update.sh"'

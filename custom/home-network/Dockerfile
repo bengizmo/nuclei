@@ -7,7 +7,11 @@ RUN apk add --no-cache \
     jq \
     curl \
     git \
-    nmap
+    nmap \
+    nmap-scripts \
+    net-tools \
+    arp-scan \
+    iproute2
 
 # Download nuclei templates
 RUN nuclei -update-templates
