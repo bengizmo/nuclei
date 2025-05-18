@@ -21,4 +21,4 @@ RUN touch /root/.config/nuclei/.nuclei-ignore
 WORKDIR /home/nuclei
 
 # Default command
-CMD ["/home/nuclei/scripts/multi-vlan-scan.sh"]
+CMD ["sleep", "infinity"]

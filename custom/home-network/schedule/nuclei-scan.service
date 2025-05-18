@@ -1,0 +1,13 @@
+[Unit]
+Description=Nuclei Security Scanner
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/docker exec nuclei-scanner /home/nuclei/scripts/improved-multi-vlan-scan.sh
+StandardOutput=append:/volume2/docker/nuclei/logs/systemd.log
+StandardError=append:/volume2/docker/nuclei/logs/systemd.log
+
+[Install]
+WantedBy=multi-user.target
