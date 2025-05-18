@@ -15,7 +15,7 @@ services:
       - ./critical-hosts.txt:/home/nuclei/critical-hosts.txt:ro
     environment:
       - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
-      - PDCP_API_KEY=b1e5b881-f0b7-4cf8-95b3-05de6b978052
+      - PDCP_API_KEY=${PDCP_API_KEY}
       - OLLAMA_API=http://192.168.10.249:11434/v1
     networks:
       vlan_default:
