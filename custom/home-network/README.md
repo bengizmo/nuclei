@@ -1,6 +1,32 @@
 # Nuclei Home Network Security Scanner
 
-Custom configuration for running Nuclei on a Synology NAS to scan a multi-VLAN home network.
+A comprehensive network security scanning system for home networks using Nuclei, with automatic device discovery, profiling, and AI-powered analysis.
+
+## Features
+
+### 🔍 Network Discovery
+- Continuous NMAP-based discovery across all VLANs
+- Automatic device profiling with OS/service detection
+- Targeted vulnerability scanning based on device type
+- Mobile notifications for new device detection
+
+### 🛡️ Vulnerability Scanning
+- Nuclei-based security scanning
+- Custom templates for different device types
+- AI-powered scan summaries via Ollama
+- Multi-VLAN support (Default, IoT, Guest, Clients)
+
+### 📊 Home Assistant Integration
+- Real-time sensor entities
+- Device count tracking
+- Security status monitoring
+- Mobile notifications via Home Assistant
+
+### 🤖 AI Analysis
+- Ollama-powered security summaries
+- Actionable security recommendations
+- Device risk assessment
+- Automated insight generation
 
 ## Network Configuration
 
@@ -11,53 +37,46 @@ Custom configuration for running Nuclei on a Synology NAS to scan a multi-VLAN h
 - **ISOLATED VLAN 40**: 192.168.40.0/28 - Corporate devices (isolated)
 - **VPN**: 192.168.3.0/24 - VPN clients
 
-## Setup Instructions
+## Quick Start
 
-1. Fork the main Nuclei repository on GitHub at https://github.com/projectdiscovery/nuclei
-
-2. Clone your fork locally:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/nuclei.git
-   cd nuclei
-   ```
-
-3. Set up remotes:
-   ```bash
-   git remote add upstream https://github.com/projectdiscovery/nuclei.git
-   git remote -v  # Verify remotes
-   ```
-
-4. Create a branch for your customizations:
-   ```bash
-   git checkout -b home-network-setup
-   ```
-
-5. Add custom configuration:
-   ```bash
-   # Copy this directory to your fork
-   cp -r custom/home-network /path/to/your/fork/custom/
-   ```
-
-6. Commit and push:
-   ```bash
-   git add custom/home-network
-   git commit -m "Add home network scanning configuration"
-   git push origin home-network-setup
-   ```
-
-7. Deploy to your Synology NAS (192.168.10.163)
-
-## Deployment
-
+### Deploy to Synology NAS
 ```bash
-# On your Synology NAS
-cd /volume1/docker/nuclei
-docker-compose up -d
+# Deploy the container
+cd /Users/ben/dev/nuclei/custom/home-network
+./deploy-remote.sh
+
+# Initialize discovery system
+ssh ben@192.168.10.163 '/usr/local/bin/docker exec nuclei-scanner sh /home/nuclei/scripts/initialize-discovery-db.sh'
 ```
 
-## Home Assistant Integration
+## Home Assistant Entities
 
-Add the configuration from `home-assistant-config.yaml` to your Home Assistant setup.
+The system creates these sensor entities:
+- `sensor.nuclei_scanner` - Main scanner status
+- `sensor.nuclei_scanner_findings` - Vulnerability count
+- `sensor.nuclei_scanner_summary` - AI security summary
+- `sensor.nuclei_devices_found` - Total devices discovered
+- `sensor.nuclei_new_devices` - New devices found
+
+## Documentation
+
+- [Network Discovery System](README-NETWORK-DISCOVERY.md)
+- [AI Summary Integration](README-AI-SUMMARY.md)
+
+## Key Scripts
+
+- `network-discovery.sh` - Continuous device discovery
+- `profile-new-host.sh` - Device profiling
+- `scan-with-ai-summary.sh` - Security scan with AI analysis
+- `update-discovery-entities.sh` - Update HA entities
+
+## Security Features
+
+- Automatic detection of new devices
+- Device type classification
+- Targeted vulnerability scanning
+- AI-powered risk assessment
+- Mobile notifications for security events
 
 ## Updating Nuclei
 
@@ -79,8 +98,13 @@ git checkout home-network-setup
 git merge main
 ```
 
-## Security Notes
+## Requirements
 
-- API key is included in docker-compose.yml - consider using secrets management
-- Ensure proper firewall rules between VLANs
-- Regularly update Nuclei templates
+- Synology NAS with Docker
+- Home Assistant for notifications
+- Ollama for AI summaries (192.168.10.249)
+- Network with VLAN support
+
+## License
+
+This project is an extension of [Nuclei](https://github.com/projectdiscovery/nuclei) by ProjectDiscovery.

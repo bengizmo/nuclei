@@ -40,14 +40,17 @@ SERVICES=$(nmap -sV "$IP" 2>/dev/null | grep "open" | awk '{print $1 "/" $3}' | 
 DEVICE_TYPE="unknown"
 NUCLEI_TEMPLATES=""
 
-# Detection logic
-if echo "$SERVICES" | grep -E "(http|https)" >/dev/null; then
-    if echo "$OS_GUESS" | grep -i "linux" >/dev/null; then
-        if echo "$SERVICES" | grep -E "22/tcp" >/dev/null; then
-            DEVICE_TYPE="linux-server"
-            NUCLEI_TEMPLATES="exposed-panels/ default-logins/ cves/2024/ cves/2023/"
-        fi
+# Enhanced detection logic
+if echo "$SERVICES" | grep -E "22/tcp/ssh" >/dev/null; then
+    DEVICE_TYPE="linux-server"
+    NUCLEI_TEMPLATES="exposed-panels/ default-logins/ cves/2024/ cves/2023/ ssh/"
+fi
+
+if echo "$SERVICES" | grep -E "(80/tcp|443/tcp|8080/tcp|8443/tcp)" >/dev/null; then
+    if [ "$DEVICE_TYPE" = "unknown" ]; then
+        DEVICE_TYPE="web-server"
     fi
+    NUCLEI_TEMPLATES="$NUCLEI_TEMPLATES http/ exposed-panels/ default-logins/"
 fi
 
 if echo "$SERVICES" | grep -E "445/tcp|139/tcp" >/dev/null; then

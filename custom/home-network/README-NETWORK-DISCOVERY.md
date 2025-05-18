@@ -5,8 +5,8 @@ This system provides continuous network monitoring that:
 - Scans all VLANs every 5 minutes for new devices
 - Automatically profiles new devices with detailed NMAP scans
 - Runs targeted Nuclei vulnerability scans based on device type
-- Generates AI-powered security assessments
-- Updates Home Assistant with real-time network status
+- Sends mobile notifications for new device detection
+- Updates Home Assistant entities with device counts
 
 ## Features
 
@@ -59,23 +59,14 @@ ssh ben@192.168.10.163 '/usr/local/bin/docker exec nuclei-scanner sh /home/nucle
 
 ## Home Assistant Integration
 
-### New Sensors
-- `sensor.nuclei_network_discovery` - Main network discovery status
-- `sensor.nuclei_vlan_default` - Devices on default VLAN
-- `sensor.nuclei_vlan_iot` - Devices on IoT VLAN
-- `sensor.nuclei_vlan_guest` - Devices on guest VLAN
-- `sensor.nuclei_vlan_clients` - Devices on clients VLAN
-- `sensor.nuclei_new_device_alert` - Alert for new device detection
-- `sensor.nuclei_device_discovery_summary` - AI summary of new devices
-- `sensor.nuclei_network_map` - Network topology data
+### Entities
+- `sensor.nuclei_devices_found` - Total number of devices discovered on the network
+- `sensor.nuclei_new_devices` - Number of new devices found (when applicable)
 
-### Dashboard
-Add the discovery dashboard from `home-assistant/discovery-dashboard.yaml` to monitor:
-- Real-time device count
-- Device type breakdown
-- VLAN distribution
-- Recent discoveries
-- Security alerts for new devices
+### Notifications
+The system automatically sends mobile notifications to your phone when:
+- New devices are discovered on the network
+- Vulnerabilities are found on newly profiled devices
 
 ## Network Map Visualization
 The system generates a network topology map showing:
@@ -89,9 +80,7 @@ The system generates a network topology map showing:
 ### Core Scripts
 - `network-discovery.sh` - Main discovery loop (runs continuously)
 - `profile-new-host.sh` - Profiles newly discovered devices
-- `generate-device-summary.sh` - Creates AI summaries for new devices
-- `discovery-dashboard-update.sh` - Updates Home Assistant sensors
-- `network-map-generator.sh` - Creates network topology visualization
+- `update-discovery-entities.sh` - Updates Home Assistant sensors
 
 ### Usage Examples
 

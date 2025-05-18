@@ -13,11 +13,11 @@ echo "# Format: IP|MAC|FirstSeen|LastSeen|Hostname|OS|Services|ProfileStatus" >>
 # Add known critical infrastructure
 echo "Importing critical infrastructure hosts..."
 
-# Parse critical hosts file
-grep -v "^#" "$CRITICAL_HOSTS" | while IFS=$'\t' read -r ip name; do
-    # Clean up the input
-    ip=$(echo "$ip" | tr -d ' ')
-    name=$(echo "$name" | tr -d ' ' | sed 's/#.*//')
+# Parse critical hosts file with space or tab delimiter
+grep -v "^#" "$CRITICAL_HOSTS" | while read -r line; do
+    # Parse line with spaces or tabs
+    ip=$(echo "$line" | awk '{print $1}')
+    name=$(echo "$line" | awk '{$1=""; print $0}' | sed 's/^ *//' | sed 's/#.*//')
     
     if [ -n "$ip" ] && [ -n "$name" ]; then
         # Determine device type based on name
