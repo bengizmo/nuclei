@@ -24,7 +24,7 @@ while true; do
     # Daily full scan at 3:00 AM
     if [ "$current_hour" = "03" ] && [ "$current_minute" = "00" ]; then
         echo "$(date): Running daily full scan..."
-        /home/nuclei/scripts/improved-multi-vlan-scan.sh >> /home/nuclei/logs/daily.log 2>&1
+        /home/nuclei/scripts/scan-with-ha-modern.sh >> /home/nuclei/logs/daily.log 2>&1
         sleep 60
     fi
     

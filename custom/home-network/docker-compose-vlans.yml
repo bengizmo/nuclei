@@ -1,0 +1,20 @@
+# Docker Compose for Nuclei with VLAN support using host networking
+version: '3.8'
+
+services:
+  nuclei:
+    build: .
+    container_name: nuclei-scanner
+    volumes:
+      - ./results:/home/nuclei/results
+      - ./scripts:/home/nuclei/scripts
+      - ./critical-hosts.txt:/home/nuclei/critical-hosts.txt:ro
+    environment:
+      - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
+      - PDCP_API_KEY=b1e5b881-f0b7-4cf8-95b3-05de6b978052
+      - OLLAMA_API=http://192.168.10.249:11434/v1
+    network_mode: host
+    cap_add:
+      - NET_ADMIN  # Required for network operations
+    restart: unless-stopped
+    command: sleep infinity
