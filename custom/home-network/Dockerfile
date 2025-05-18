@@ -6,7 +6,8 @@ USER root
 RUN apk add --no-cache \
     jq \
     curl \
-    git
+    git \
+    nmap
 
 # Download nuclei templates
 RUN nuclei -update-templates
@@ -20,5 +21,6 @@ RUN touch /root/.config/nuclei/.nuclei-ignore
 # Set working directory
 WORKDIR /home/nuclei
 
-# Default command
+# Override the entrypoint and set command
+ENTRYPOINT []
 CMD ["sleep", "infinity"]
