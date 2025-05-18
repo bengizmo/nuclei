@@ -1,0 +1,149 @@
+# Home Assistant configuration for Nuclei scanner dashboard
+# Add this to your configuration.yaml
+
+# Template sensor to show the scanner status with more details
+template:
+  - sensor:
+      - name: "Nuclei Scanner Status"
+        unique_id: nuclei_scanner_status
+        state: "{{ states('input_text.nuclei_status') }}"
+        icon: >
+          {% if is_state('input_text.nuclei_status', 'scanning') %}
+            mdi:shield-sync
+          {% elif is_state('input_text.nuclei_status', 'alert') %}
+            mdi:shield-alert
+          {% else %}
+            mdi:shield-check
+          {% endif %}
+        attributes:
+          last_scan: "{{ states('input_datetime.nuclei_last_scan') }}"
+          findings_count: "{{ states('input_number.nuclei_findings') | int }}"
+          hosts_scanned: "{{ states('input_number.nuclei_hosts_scanned') | int }}"
+          status_color: >
+            {% if is_state('input_text.nuclei_status', 'scanning') %}
+              blue
+            {% elif is_state('input_text.nuclei_status', 'alert') %}
+              red
+            {% else %}
+              green
+            {% endif %}
+
+# Lovelace card configuration
+# Add this to your dashboard:
+type: vertical-stack
+title: Network Security Scanner
+cards:
+  - type: custom:button-card
+    entity: sensor.nuclei_scanner_status
+    show_state: true
+    show_last_changed: true
+    size: 50px
+    styles:
+      card:
+        - background-color: |
+            [[[
+              if (entity.state == 'scanning') return 'var(--primary-color)';
+              if (entity.state == 'alert') return 'var(--error-color)';
+              return 'var(--success-color)';
+            ]]]
+      name:
+        - font-size: 18px
+        - font-weight: bold
+      state:
+        - font-size: 14px
+      icon:
+        - color: white
+  
+  - type: entities
+    title: Scan Details
+    entities:
+      - type: attribute
+        entity: sensor.nuclei_scanner_status
+        attribute: last_scan
+        name: Last Scan
+        icon: mdi:clock-outline
+      - type: attribute
+        entity: sensor.nuclei_scanner_status
+        attribute: findings_count
+        name: Vulnerabilities Found
+        icon: mdi:bug
+      - type: attribute
+        entity: sensor.nuclei_scanner_status
+        attribute: hosts_scanned
+        name: Hosts Scanned
+        icon: mdi:server-network
+  
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Run Scan
+        icon: mdi:play
+        tap_action:
+          action: call-service
+          service: shell_command.run_nuclei_scan
+        entity_id: sensor.nuclei_scanner_status
+        show_state: false
+      
+      - type: button
+        name: View Logs
+        icon: mdi:text-box-outline
+        tap_action:
+          action: call-service
+          service: shell_command.view_nuclei_logs
+        entity_id: sensor.nuclei_scanner_status
+        show_state: false
+
+# Shell commands for button actions
+shell_command:
+  run_nuclei_scan: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner sh /home/nuclei/scripts/quick-ha-scan.sh"'
+  view_nuclei_logs: 'ssh ben@192.168.10.163 "/usr/local/bin/docker logs --tail 50 nuclei-scanner"'
+
+# Automations
+automation:
+  - alias: "Nuclei Daily Scan"
+    trigger:
+      - platform: time
+        at: "03:00:00"
+    action:
+      - service: shell_command.run_nuclei_scan
+  
+  - alias: "Nuclei Alert Notification"
+    trigger:
+      - platform: state
+        entity_id: input_text.nuclei_status
+        to: "alert"
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "Security Alert"
+          message: "Nuclei found {{ states('input_number.nuclei_findings') }} vulnerabilities on your network!"
+          data:
+            push:
+              sound:
+                name: "alarm.caf"
+                critical: 1
+                volume: 1.0
+  
+  - alias: "Nuclei Scan Complete"
+    trigger:
+      - platform: state
+        entity_id: input_text.nuclei_status
+        from: "scanning"
+    condition:
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: input_text.nuclei_status
+            state: "scanning"
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "Scan Complete"
+          message: >
+            Nuclei scan finished. 
+            Status: {{ states('input_text.nuclei_status') }}
+            Findings: {{ states('input_number.nuclei_findings') }}
+          data:
+            push:
+              sound:
+                name: "default"

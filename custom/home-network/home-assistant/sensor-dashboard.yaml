@@ -1,0 +1,139 @@
+# Home Assistant Dashboard for Nuclei Scanner Sensors
+# This uses the proper sensor entities instead of input helpers
+
+# Card configuration for your dashboard
+type: vertical-stack
+title: Network Security Scanner
+cards:
+  - type: custom:mushroom-entity-card
+    entity: sensor.nuclei_scanner
+    name: Nuclei Scanner
+    icon_color: |
+      {% if is_state('sensor.nuclei_scanner', 'scanning') %}
+        blue
+      {% elif is_state('sensor.nuclei_scanner', 'alert') %}
+        red
+      {% else %}
+        green
+      {% endif %}
+    primary_info: name
+    secondary_info: state
+    tap_action:
+      action: more-info
+
+  - type: horizontal-stack
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_scanner_findings
+        name: Vulnerabilities
+        icon: mdi:bug
+        icon_color: |
+          {% if states('sensor.nuclei_scanner_findings')|int > 0 %}
+            red
+          {% else %}
+            green
+          {% endif %}
+        primary_info: name
+        secondary_info: state
+      
+      - type: custom:mushroom-entity-card
+        entity: sensor.nuclei_scanner_hosts
+        name: Hosts Scanned
+        icon: mdi:server-network
+        icon_color: blue
+        primary_info: name
+        secondary_info: state
+
+  - type: entities
+    entities:
+      - entity: sensor.nuclei_scanner_status
+        name: Status
+      - entity: sensor.nuclei_scanner_last_scan
+        name: Last Scan
+        format: relative
+
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Run Scan
+        icon: mdi:play
+        tap_action:
+          action: call-service
+          service: shell_command.run_nuclei_sensor_scan
+      
+      - type: button
+        name: Full VLAN Scan
+        icon: mdi:shield-search
+        tap_action:
+          action: call-service
+          service: shell_command.run_nuclei_full_scan
+
+# Shell commands
+shell_command:
+  run_nuclei_sensor_scan: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner sh /home/nuclei/scripts/scan-with-sensors.sh"'
+  run_nuclei_full_scan: 'ssh ben@192.168.10.163 "/usr/local/bin/docker exec nuclei-scanner sh /home/nuclei/scripts/full-vlan-scan.sh"'
+
+# Automations
+automation:
+  - alias: "Nuclei Daily Scan with Sensors"
+    trigger:
+      - platform: time
+        at: "03:00:00"
+    action:
+      - service: shell_command.run_nuclei_sensor_scan
+  
+  - alias: "Nuclei Security Alert"
+    trigger:
+      - platform: state
+        entity_id: sensor.nuclei_scanner_status
+        to: "alert"
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "🚨 Security Alert"
+          message: >
+            Nuclei found {{ states('sensor.nuclei_scanner_findings') }} vulnerabilities!
+          data:
+            push:
+              sound:
+                name: "alarm.caf"
+                critical: 1
+                volume: 1.0
+            actions:
+              - action: "VIEW_RESULTS"
+                title: "View Results"
+  
+  - alias: "Nuclei Scan Complete"
+    trigger:
+      - platform: state
+        entity_id: sensor.nuclei_scanner_status
+        from: "scanning"
+        to: 
+          - "ok"
+          - "alert"
+    action:
+      - service: notify.mobile_app_ben_s_iphone_15
+        data:
+          title: "✅ Scan Complete"
+          message: >
+            Status: {{ states('sensor.nuclei_scanner_status') }}
+            Findings: {{ states('sensor.nuclei_scanner_findings') }}
+            Hosts: {{ states('sensor.nuclei_scanner_hosts') }}
+
+# Template sensors for additional info (optional)
+template:
+  - sensor:
+      - name: "Nuclei Scanner Summary"
+        unique_id: nuclei_scanner_summary
+        state: >
+          {% if is_state('sensor.nuclei_scanner_status', 'scanning') %}
+            Scanning {{ states('sensor.nuclei_scanner_hosts') }} hosts...
+          {% elif is_state('sensor.nuclei_scanner_status', 'alert') %}
+            ⚠️ {{ states('sensor.nuclei_scanner_findings') }} vulnerabilities found
+          {% else %}
+            ✅ No vulnerabilities found
+          {% endif %}
+        attributes:
+          icon: mdi:shield-search
+          last_scan_relative: >
+            {{ relative_time(states('sensor.nuclei_scanner_last_scan')) }} ago

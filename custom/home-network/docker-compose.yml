@@ -1,14 +1,10 @@
-# Docker Compose for Nuclei Multi-VLAN Home Network Scanning
-# To be deployed on Synology NAS (192.168.10.163)
-
+# Docker Compose for Nuclei with VLAN support using host networking
 version: '3.8'
 
 services:
   nuclei:
     build: .
     container_name: nuclei-scanner
-    cap_add:
-      - NET_ADMIN  # Required for multiple VLANs
     volumes:
       - ./results:/home/nuclei/results
       - ./scripts:/home/nuclei/scripts
@@ -17,48 +13,8 @@ services:
       - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
       - PDCP_API_KEY=${PDCP_API_KEY}
       - OLLAMA_API=http://192.168.10.249:11434/v1
-    networks:
-      vlan_default:
-        ipv4_address: 192.168.10.200
-      vlan_iot:
-        ipv4_address: 192.168.14.200
-      vlan_guest:
-        ipv4_address: 192.168.5.200
-      vlan_clients:
-        ipv4_address: 192.168.6.200
+    network_mode: host
+    cap_add:
+      - NET_ADMIN  # Required for network operations
     restart: unless-stopped
-    command: tail -f /dev/null
-
-networks:
-  vlan_default:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.1
-    ipam:
-      config:
-        - subnet: 192.168.10.0/24
-          gateway: 192.168.10.1
-  vlan_iot:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.2
-    ipam:
-      config:
-        - subnet: 192.168.14.0/24
-          gateway: 192.168.14.1
-  vlan_guest:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.3
-    ipam:
-      config:
-        - subnet: 192.168.5.0/24
-          gateway: 192.168.5.1
-  vlan_clients:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.4
-    ipam:
-      config:
-        - subnet: 192.168.6.0/24
-          gateway: 192.168.6.1
+    command: sleep infinity
