@@ -15,4 +15,4 @@ services:
       - OLLAMA_API=http://192.168.10.249:11434/v1
     network_mode: host
     restart: unless-stopped
-    command: tail -f /dev/null
+    command: sleep infinity
