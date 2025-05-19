@@ -57,8 +57,8 @@ scan_subnet() {
             echo "$ip|$mac|$(date '+%Y-%m-%d %H:%M:%S')|$(date '+%Y-%m-%d %H:%M:%S')|$hostname|||pending" >> "$DISCOVERY_DB"
             echo "$ip" >> "$NEW_HOSTS_FILE"
             
-            # Trigger immediate profiling
-            /home/nuclei/scripts/profile-new-host.sh "$ip" "$vlan_name" &
+            # Trigger immediate profiling with enhanced script
+            /home/nuclei/scripts/profile-new-host-enhanced.sh "$ip" "$vlan_name" &
         fi
     done
     
@@ -107,13 +107,6 @@ while true; do
     
     if [ "$new_hosts" -gt 0 ]; then
         log_message "Discovery cycle complete. Found $new_hosts new hosts out of $total_hosts total"
-        
-        # Send notification to Home Assistant
-        curl -s -X POST \
-            -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"message\": \"Found ${new_hosts} new devices on network\", \"title\": \"Network Discovery\"}" \
-            "http://192.168.10.89:8123/api/services/notify/mobile_app_ben_s_iphone_15"
     else
         log_message "Discovery cycle complete. No new hosts found. Total: $total_hosts"
     fi

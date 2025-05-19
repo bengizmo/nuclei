@@ -16,8 +16,12 @@ OS=$(echo "$DEVICE_INFO" | cut -d'|' -f6)
 SERVICES=$(echo "$DEVICE_INFO" | cut -d'|' -f7)
 HOSTNAME=$(echo "$DEVICE_INFO" | cut -d'|' -f5)
 
-# Create prompt for Ollama
-PROMPT_TEXT="Analyze this newly discovered network device and provide a security assessment in 1-2 sentences. Device details: IP=$IP, Type=$DEVICE_TYPE, OS=$OS, Services=$SERVICES, Hostname=$HOSTNAME, Vulnerabilities found=$FINDINGS. Provide actionable security recommendations."
+# Create prompt for Ollama based on findings
+if [ "$FINDINGS" -eq 0 ]; then
+    PROMPT_TEXT="Brief security summary for new device in JSON with 'summary' field. Keep under 200 chars. Device: IP=$IP, Type=$DEVICE_TYPE, OS=$OS."
+else
+    PROMPT_TEXT="Security alert for device in JSON with 'summary' field. List vulnerabilities and actions. Device: IP=$IP, Type=$DEVICE_TYPE, Vulnerabilities=$FINDINGS."
+fi
 
 # Create JSON request
 REQUEST_BODY=$(jq -n \
@@ -38,10 +42,26 @@ SUMMARY_RAW=$(curl -s -X POST \
 if echo "$SUMMARY_RAW" | jq -e . >/dev/null 2>&1; then
     SUMMARY=$(echo "$SUMMARY_RAW" | jq -r '.summary')
 else
-    SUMMARY="New $DEVICE_TYPE device at $IP requires security review. Found $FINDINGS potential vulnerabilities."
+    if [ "$FINDINGS" -eq 0 ]; then
+        SUMMARY="New $DEVICE_TYPE device at $IP detected and secure."
+    else
+        SUMMARY="Alert: New $DEVICE_TYPE at $IP has $FINDINGS vulnerabilities. Immediate review required."
+    fi
 fi
 
 # Update Home Assistant with device summary
+# Ensure we have the token
+if [ -z "$HA_TOKEN" ]; then
+    HA_TOKEN="${HOME_ASSISTANT_API_TOKEN}"
+fi
+
+# Debug: Show token status
+if [ -n "$HA_TOKEN" ]; then
+    echo "Using HA token: ${HA_TOKEN:0:20}..."
+else
+    echo "Warning: No HA token found"
+fi
+
 curl -s -X POST \
     -H "Authorization: Bearer ${HA_TOKEN}" \
     -H "Content-Type: application/json" \

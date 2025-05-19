@@ -89,7 +89,13 @@ SCAN_DATA="$SCAN_DATA\nHosts scanned: $hosts_count"
 
 # Create structured prompt for Ollama - prepare data and prompt
 SCAN_DATA_CLEAN=$(echo "$SCAN_DATA" | tr '\n' ' ' | sed 's/"/\\"/g')
-PROMPT_TEXT="Analyze these network scan results and return a JSON object with a single 'summary' field containing 1-2 sentences about the security status and recommended actions. Scan results: $SCAN_DATA_CLEAN"
+# Determine prompt based on findings
+TOTAL_VULNS=$((CRITICAL_COUNT + HIGH_COUNT + MEDIUM_COUNT))
+if [ "$TOTAL_VULNS" -eq 0 ]; then
+    PROMPT_TEXT="Report security status for network scan in JSON with 'summary' field. Keep under 200 characters, be concise. Scan results: $SCAN_DATA_CLEAN"
+else
+    PROMPT_TEXT="Analyze vulnerabilities and return JSON with 'summary' field including vulnerability list and required actions. Scan results: $SCAN_DATA_CLEAN"
+fi
 
 # Create the JSON request body
 REQUEST_BODY=$(jq -n \
@@ -120,38 +126,61 @@ fi
 # If Ollama fails, use a fallback summary
 if [ -z "$SUMMARY" ] || [ "$SUMMARY" = "null" ]; then
     echo "Ollama request failed, using fallback summary"
-    SUMMARY="Scan completed. Found ${CRITICAL_COUNT:-0} critical, ${HIGH_COUNT:-0} high, ${MEDIUM_COUNT:-0} medium, and ${LOW_COUNT:-0} low severity vulnerabilities across ${hosts_count} hosts."
+    if [ "$TOTAL_VULNS" -eq 0 ]; then
+        SUMMARY="Scan complete: ${hosts_count} hosts secure, no vulnerabilities found."
+    else
+        SUMMARY="Alert: Found ${CRITICAL_COUNT:-0} critical, ${HIGH_COUNT:-0} high, ${MEDIUM_COUNT:-0} medium vulnerabilities. Immediate action required."
+    fi
 fi
 
 echo "Summary: $SUMMARY"
 
 # Update Home Assistant sensor with the summary
 echo "Updating Home Assistant sensor..."
+# Ensure we have the token
+if [ -z "$HA_TOKEN" ]; then
+    HA_TOKEN="${HOME_ASSISTANT_API_TOKEN}"
+fi
+
+# Debug: Show token status
+if [ -n "$HA_TOKEN" ]; then
+    echo "Using HA token: ${HA_TOKEN:0:20}..."
+else
+    echo "Warning: No HA token found"
+fi
+
+# Create JSON payload
+JSON_PAYLOAD=$(cat <<EOF
+{
+    "state": "${SUMMARY}",
+    "attributes": {
+        "friendly_name": "Nuclei AI Summary",
+        "icon": "mdi:robot",
+        "generated_at": "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)",
+        "model": "${OLLAMA_MODEL}",
+        "scan_directory": "${RESULTS_DIR}",
+        "critical_count": ${CRITICAL_COUNT:-0},
+        "high_count": ${HIGH_COUNT:-0},
+        "medium_count": ${MEDIUM_COUNT:-0},
+        "low_count": ${LOW_COUNT:-0},
+        "hosts_scanned": ${hosts_count},
+        "device": {
+            "identifiers": ["nuclei_scanner_001"],
+            "name": "Nuclei Scanner",
+            "model": "Network Vulnerability Scanner",
+            "manufacturer": "ProjectDiscovery",
+            "sw_version": "3.4.2"
+        }
+    }
+}
+EOF
+)
+
+# Send update
 curl -s -X POST \
     -H "Authorization: Bearer ${HA_TOKEN}" \
     -H "Content-Type: application/json" \
-    -d "{
-        \"state\": \"${SUMMARY}\",
-        \"attributes\": {
-            \"friendly_name\": \"Nuclei AI Summary\",
-            \"icon\": \"mdi:robot\",
-            \"generated_at\": \"$(date -u +%Y-%m-%dT%H:%M:%S+00:00)\",
-            \"model\": \"${OLLAMA_MODEL}\",
-            \"scan_directory\": \"${RESULTS_DIR}\",
-            \"critical_count\": ${CRITICAL_COUNT:-0},
-            \"high_count\": ${HIGH_COUNT:-0},
-            \"medium_count\": ${MEDIUM_COUNT:-0},
-            \"low_count\": ${LOW_COUNT:-0},
-            \"hosts_scanned\": ${hosts_count},
-            \"device\": {
-                \"identifiers\": [\"nuclei_scanner_001\"],
-                \"name\": \"Nuclei Scanner\",
-                \"model\": \"Network Vulnerability Scanner\",
-                \"manufacturer\": \"ProjectDiscovery\",
-                \"sw_version\": \"3.4.2\"
-            }
-        }
-    }" \
+    -d "${JSON_PAYLOAD}" \
     "${HA_BASE_URL}/api/states/sensor.nuclei_scanner_summary"
 
 echo "AI summary updated in Home Assistant"

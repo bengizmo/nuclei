@@ -1,0 +1,7 @@
+version: '3.8'
+services:
+  nuclei:
+    environment:
+      - HOME_ASSISTANT_API_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI3ZDU0NWNmMDBhYzQ0NGJkYjY2MjcwNTNjMjA2MGViMyIsImlhdCI6MTc0NzUxNDQ3NiwiZXhwIjoyMDYyODc0NDc2fQ.ZrYGer1Q4qfZt2j5PIV0kwOOeZEkFs-sgiLtsBfpTOM
+      - PDCP_API_KEY=b1e5b881-f0b7-4cf8-95b3-05de6b978052
+      - OLLAMA_API=http://192.168.10.249:11434/v1
