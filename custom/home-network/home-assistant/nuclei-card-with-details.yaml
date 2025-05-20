@@ -1,0 +1,117 @@
+type: custom:stack-in-card
+cards:
+  - type: custom:mushroom-template-card
+    entity: sensor.nuclei_scanner_status
+    primary: "Nuclei Security Scanner"
+    secondary: "{{ states('sensor.nuclei_scanner_summary') }}"
+    icon: mdi:shield-search
+    icon_color: "{% if is_state(entity, 'alert') %}red{% elif is_state(entity, 'scanning') %}blue{% else %}green{% endif %}"
+    tap_action:
+      action: more-info
+      entity: sensor.nuclei_scanner_summary
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: template
+        entity: sensor.nuclei_scanner_findings
+        content: "Vulns: {{ states(entity) }}"
+        icon: mdi:bug-outline
+        icon_color: >-
+          {% set count = states(entity) | int %}
+          {% if count > 10 %}
+            red
+          {% elif count > 5 %}
+            orange
+          {% elif count > 0 %}
+            yellow
+          {% else %}
+            green
+          {% endif %}
+        tap_action:
+          action: fire-dom-event
+          browser_mod:
+            service: browser_mod.popup
+            data:
+              title: "Vulnerability Details"
+              content:
+                type: markdown
+                content: >-
+                  ## Vulnerability Summary
+
+                  **Total:** {{ states('sensor.nuclei_scanner_findings') }} vulnerabilities
+
+                  **Severity:**
+                  - Critical: {{ state_attr('sensor.nuclei_scanner_findings', 'critical_count') }}
+                  - High: {{ state_attr('sensor.nuclei_scanner_findings', 'high_count') }}
+                  - Medium: {{ state_attr('sensor.nuclei_scanner_findings', 'medium_count') }}
+                  - Low: {{ state_attr('sensor.nuclei_scanner_findings', 'low_count') }}
+
+                  ## Affected Hosts
+
+                  {% set vuln_list = state_attr('sensor.nuclei_scanner_findings', 'vulnerability_list') %}
+                  {% if vuln_list %}
+                    {% for host_entry in vuln_list.split(';') %}
+                      {% set host_parts = host_entry.split(':') %}
+                      {% if host_parts | length > 1 %}
+                        ### {{ host_parts[0] }}
+                        {% for vuln in host_parts[1].split(',') %}
+                        - {{ vuln }}
+                        {% endfor %}
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    No vulnerabilities found
+                  {% endif %}
+      - type: template
+        entity: sensor.nuclei_scanner_hosts
+        content: "Hosts: {{ states(entity) }}"
+        icon: mdi:server-network
+        icon_color: "{% if states(entity) | int > 0 %}blue{% else %}grey{% endif %}"
+        tap_action:
+          action: more-info
+      - type: template
+        entity: sensor.nuclei_scanner_last_scan
+        content: "{{ as_timestamp(states(entity)) | timestamp_custom('%I:%M %p') }}"
+        icon: mdi:clock-outline
+        icon_color: >-
+          {% set hours_diff = ((now().timestamp() - as_timestamp(states(entity))) / 3600) | int %}
+          {% if hours_diff > 24 %}
+            red
+          {% elif hours_diff > 12 %}
+            orange
+          {% else %}
+            green
+          {% endif %}
+        tap_action:
+          action: more-info
+    alignment: end
+  - type: custom:mushroom-template-card
+    entity: sensor.nuclei_scanner_status
+    layout: vertical
+    primary: null
+    secondary: >-
+      {% set c = state_attr('sensor.nuclei_scanner_findings', 'critical_count') | int %}
+      {% set h = state_attr('sensor.nuclei_scanner_findings', 'high_count') | int %}
+      {% set m = state_attr('sensor.nuclei_scanner_findings', 'medium_count') | int %}
+      {% set l = state_attr('sensor.nuclei_scanner_findings', 'low_count') | int %}
+      <ha-icon icon="mdi:alert" color="{% if c > 0 %}red{% else %}gray{% endif %}"></ha-icon> {{ c }}
+      <ha-icon icon="mdi:alert-circle" color="{% if h > 0 %}orange{% else %}gray{% endif %}"></ha-icon> {{ h }}
+      <ha-icon icon="mdi:alert-circle-outline" color="{% if m > 0 %}yellow{% else %}gray{% endif %}"></ha-icon> {{ m }}
+      <ha-icon icon="mdi:information" color="{% if l > 0 %}blue{% else %}gray{% endif %}"></ha-icon> {{ l }}
+    fill_container: false
+    multiline_secondary: true
+    icon_color: >-
+      {% if is_state(entity, 'alert') %}
+        red
+      {% elif is_state(entity, 'scanning') %}
+        blue
+      {% else %}
+        green
+      {% endif %}
+    picture: null
+    tap_action:
+      action: call-service
+      service: script.turn_on
+      data:
+        entity_id: script.run_nuclei_scan
+    hold_action:
+      action: none
