@@ -10,11 +10,33 @@ echo ""
 
 # 1. Check discovery service
 echo "1. Discovery Service Status:"
-${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner pgrep -f network-discovery.sh" > /dev/null
+
+# Try checking for any discovery process
+${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner pgrep -f 'discovery.*\.sh'" > /dev/null
 if [ $? -eq 0 ]; then
-    echo "   ✅ Discovery service is running"
+    DISCOVERY_PROCESS=$(${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner ps -ef | grep '[d]iscovery.*\.sh' | awk '{print \$NF}'")
+    echo "   ✅ Discovery service is running (process: $DISCOVERY_PROCESS)"
 else
-    echo "   ❌ Discovery service is NOT running"
+    # If process not found, check status file for recent updates
+    STATUS_JSON=$(${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner cat /home/nuclei/discovery/status.json 2>/dev/null")
+    
+    if [ -n "$STATUS_JSON" ]; then
+        LAST_SCAN=$(echo "$STATUS_JSON" | grep -o '"last_scan":"[^"]*"' | cut -d'"' -f4)
+        STATUS=$(echo "$STATUS_JSON" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+        
+        # Get current time and calculate difference
+        CURRENT_TIME=$(date +%s)
+        LAST_SCAN_TIME=$(date -d "$LAST_SCAN" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%S%z" "$LAST_SCAN" +%s 2>/dev/null || echo 0)
+        
+        # If last scan is within the last 10 minutes, consider it active
+        if [ $((CURRENT_TIME - LAST_SCAN_TIME)) -lt 600 ] && [ "$STATUS" = "active" ]; then
+            echo "   ✅ Discovery service is active (last scan: $LAST_SCAN)"
+        else
+            echo "   ❌ Discovery service is NOT running"
+        fi
+    else
+        echo "   ❌ Discovery service is NOT running (no status file)"
+    fi
 fi
 
 # 2. Check profiling processes
