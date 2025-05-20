@@ -41,108 +41,60 @@ ${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner pkill -f nuclei"
 ${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner pkill -f profile-new-host"
 sleep 2
 
-# 4. Trigger full VLAN scan
+# 4. Trigger improved multi-VLAN scan
 echo ""
 echo "4. Triggering Full Network Scan"
 echo "-----------------------------"
 SCAN_DATE=$(date +%Y%m%d-%H%M%S)
 echo "Scan ID: $SCAN_DATE"
 
-# Create scan results directory
-${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner mkdir -p /home/nuclei/results/full-scan-$SCAN_DATE"
-
-# Define all VLANs to scan
-VLANS=(
-    "192.168.10.0/24:default"
-    "192.168.14.0/24:iot"
-    "192.168.5.0/24:guest"
-    "192.168.6.0/24:clients"
-)
-
-# Start comprehensive scan
-echo "Scanning all VLANs..."
-for vlan in "${VLANS[@]}"; do
-    IFS=':' read -r subnet name <<< "$vlan"
-    echo "Scanning $name VLAN: $subnet"
-    
-    ${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner nuclei \
-        -target $subnet \
-        -exclude-hosts '192.168.10.163' \
-        -severity low,medium,high,critical \
-        -tags network,cve,panel,misconfiguration,default-login \
-        -o /home/nuclei/results/full-scan-$SCAN_DATE/scan-$name.json \
-        -jsonl \
-        -stats-interval 30s \
-        -timeout 10s \
-        -concurrency 25" &
-done
-
-# Also scan critical infrastructure
-echo ""
-echo "Scanning critical infrastructure..."
-${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner nuclei \
-    -list /home/nuclei/critical-hosts.txt \
-    -severity info,low,medium,high,critical \
-    -t exposed-panels/ -t default-logins/ -t misconfigurations/ -t cves/ \
-    -o /home/nuclei/results/full-scan-$SCAN_DATE/critical-infrastructure.json \
-    -jsonl \
-    -stats-interval 30s" &
+# Execute the improved multi-VLAN script
+echo "Starting enhanced multi-VLAN scan (with full vulnerability assessment)..."
+${NAS_SSH} "${DOCKER_BIN} exec -d nuclei-scanner /bin/sh -c '/home/nuclei/scripts/improved-multi-vlan-scan.sh > /home/nuclei/logs/full-scan-$SCAN_DATE.log 2>&1'"
 
 # 5. Monitor scan progress
 echo ""
 echo "5. Monitoring Scan Progress"
 echo "-------------------------"
-echo "Waiting for scans to start..."
-sleep 10
+echo "Waiting for scan to start..."
+sleep 5
 
 # Check active nuclei processes
 ACTIVE_SCANS=$(${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner pgrep -f nuclei | wc -l")
 echo "Active nuclei processes: $ACTIVE_SCANS"
 
-# Show scan progress
+# Show scan progress (first 10 seconds)
 echo ""
 echo "Scan output (first 10 seconds):"
-timeout 10 ${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner tail -f /home/nuclei/logs/nuclei.log 2>/dev/null" || true
+timeout 10 ${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner tail -f /home/nuclei/logs/full-scan-$SCAN_DATE.log 2>/dev/null" || true
 
-# 6. Wait and check results
+# 6. Update Home Assistant
 echo ""
-echo "6. Preliminary Results"
-echo "--------------------"
-echo "Waiting 30 seconds for initial results..."
-sleep 30
+echo "6. Updating Home Assistant"
+echo "------------------------"
+${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner curl -s -X POST \
+    -H \"Authorization: Bearer \${HOME_ASSISTANT_API_TOKEN}\" \
+    -H \"Content-Type: application/json\" \
+    -d '{\"state\": \"scanning\", \"attributes\": {\"friendly_name\": \"Nuclei Scanner\", \"icon\": \"mdi:shield-search\", \"status\": \"Full scan in progress\", \"last_scan_start\": \"$(date -Iseconds)\"}}' \
+    \"http://192.168.10.89:8123/api/states/sensor.nuclei_scanner_system\"" >/dev/null 2>&1
 
-# Check for findings
-FINDINGS=$(${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner find /home/nuclei/results/full-scan-$SCAN_DATE -name '*.json' -exec cat {} \; | wc -l")
-echo "Vulnerabilities found so far: $FINDINGS"
-
-# 7. Generate AI summary
-echo ""
-echo "7. Generating AI Summary"
-echo "----------------------"
-${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner /home/nuclei/scripts/generate-ai-summary.sh /home/nuclei/results/full-scan-$SCAN_DATE"
-
-# 8. Check Home Assistant update
-echo ""
-echo "8. Home Assistant Status"
-echo "----------------------"
-HA_TOKEN=$(grep "HOME_ASSISTANT_API_TOKEN=" .env | cut -d'=' -f2)
-HA_URL="http://192.168.10.89:8123"
-
-SUMMARY=$(curl -s -H "Authorization: Bearer $HA_TOKEN" \
-    "$HA_URL/api/states/sensor.nuclei_scanner_summary" | \
-    jq -r '.state')
-echo "Current HA summary: $SUMMARY"
+# Send notification to Home Assistant
+${NAS_SSH} "${DOCKER_BIN} exec nuclei-scanner curl -s -X POST \
+    -H \"Authorization: Bearer \${HOME_ASSISTANT_API_TOKEN}\" \
+    -H \"Content-Type: application/json\" \
+    -d '{\"message\": \"Enhanced full network scan initiated manually. This scan will cover all devices across all VLANs.\", \"title\": \"Nuclei Scanner\"}' \
+    \"http://192.168.10.89:8123/api/services/notify/notify\"" >/dev/null 2>&1
 
 echo ""
 echo "====================================="
 echo "✅ Full scan triggered!"
 echo ""
-echo "Scan ID: full-scan-$SCAN_DATE"
-echo "Results location: /home/nuclei/results/full-scan-$SCAN_DATE"
+echo "Scan log: /home/nuclei/logs/full-scan-$SCAN_DATE.log"
+echo "Results will be in: /home/nuclei/results/$SCAN_DATE/"
 echo ""
-echo "Note: Full network scan may take 10-30 minutes to complete"
+echo "Note: Full network scan may take 30-60 minutes to complete"
 echo "Monitor progress with:"
-echo "  ${NAS_SSH} '${DOCKER_BIN} exec nuclei-scanner tail -f /home/nuclei/logs/nuclei.log'"
+echo "  ${NAS_SSH} '${DOCKER_BIN} exec nuclei-scanner tail -f /home/nuclei/logs/full-scan-$SCAN_DATE.log'"
 echo ""
-echo "Check final results with:"
-echo "  ${NAS_SSH} '${DOCKER_BIN} exec nuclei-scanner ls -la /home/nuclei/results/full-scan-$SCAN_DATE/'"
+echo "Check status when complete:"
+echo "  ./check-nas.sh"
