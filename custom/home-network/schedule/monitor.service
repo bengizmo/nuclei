@@ -1,0 +1,15 @@
+[Unit]
+Description=Nuclei Discovery Monitor
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/docker exec nuclei-scanner /home/nuclei/scripts/monitor-discovery.sh
+Restart=always
+RestartSec=300
+StandardOutput=append:/volume2/docker/nuclei/logs/monitor.log
+StandardError=append:/volume2/docker/nuclei/logs/monitor.log
+
+[Install]
+WantedBy=multi-user.target

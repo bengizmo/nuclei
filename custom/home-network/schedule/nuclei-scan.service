@@ -5,9 +5,16 @@ After=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/docker exec nuclei-scanner /home/nuclei/scripts/improved-multi-vlan-scan.sh
+# Check container health before executing
+ExecStartPre=/bin/sh -c "if ! /usr/local/bin/docker exec nuclei-scanner pgrep -f network-discovery; then echo 'Discovery service not running, restarting container...'; /usr/local/bin/docker restart nuclei-scanner; sleep 30; fi"
+# Execute scan with improved status tracking
+ExecStart=/bin/sh -c "/usr/local/bin/docker exec nuclei-scanner /home/nuclei/scripts/scan-with-ha-modern.sh > /volume2/docker/nuclei/logs/scan-$(date +%%Y%%m%%d-%%H%%M%%S).log 2>&1"
+# Update Home Assistant after scan
+ExecStopPost=/bin/sh -c "echo 'Scan completed at $(date)' >> /volume2/docker/nuclei/logs/systemd.log"
 StandardOutput=append:/volume2/docker/nuclei/logs/systemd.log
 StandardError=append:/volume2/docker/nuclei/logs/systemd.log
+TimeoutStartSec=1800
+TimeoutStopSec=300
 
 [Install]
 WantedBy=multi-user.target

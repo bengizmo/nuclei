@@ -6,502 +6,200 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Nuclei is a fast template-based vulnerability scanner written in Go. It uses simple YAML-based templates to define custom vulnerability detection scenarios. The project supports multiple protocols including HTTP, DNS, TCP, SSL, WHOIS, JavaScript, and more.
 
+This custom implementation adds Home Assistant integration and continuous network discovery capabilities.
+
 ## High-Level Architecture
 
-### Core Packages
+### Core Components
 
-- **`cmd/nuclei/`**: Main entry point for the CLI application
-- **`internal/runner/`**: Core runner logic for executing scans
-- **`pkg/`**: Main packages containing most of the application logic
-  - **`protocols/`**: Different protocol implementations (http, dns, tcp, etc.)
-  - **`templates/`**: Template parsing and execution engine
-  - **`types/`**: Core types and options definitions
-  - **`core/`**: Engine implementation and execution logic
-  - **`output/`**: Result formatting and output handling
-  - **`catalog/`**: Template catalog management
-  - **`js/`**: JavaScript runtime for JS-based templates
+1. **Docker Container**: Self-contained scanning environment
+2. **Network Discovery Service**: Continuously monitors all VLANs for new devices
+3. **Vulnerability Scanner**: Performs targeted and scheduled security scans
+4. **Home Assistant Integration**: Real-time status updates and notifications
+5. **Monitoring Service**: Ensures continuous operation of all services
 
-### Key Design Patterns
+### Key Scripts
 
-1. **Template Engine**: YAML templates are parsed into protocol-specific executors
-2. **Protocol Abstraction**: Each protocol implements a common interface for execution
-3. **Workflow System**: Complex scanning workflows can be defined with conditional logic
-4. **Plugin System**: Extensible through JavaScript and code-based templates
+- **`entrypoint.sh`**: Container initialization and service orchestration
+- **`simple-discovery-enhanced.sh`**: Network discovery with vulnerability tracking
+- **`profile-new-host-enhanced.sh`**: Automatic device fingerprinting and scanning
+- **`scan-with-ha-modern.sh`**: Modern HA integration with AI summaries
+- **`monitor-discovery.sh`**: Service monitoring and self-healing
 
-## Common Development Commands
+## Common Commands
 
-### Build Commands
+### Container Management
 ```bash
-# Build nuclei binary
-make build
+# Start the container
+docker-compose up -d
 
-# Build with memory profiling support  
-make build-stats
+# Restart the container
+docker restart nuclei-scanner
 
-# Clean build artifacts
-make clean
+# Check container logs
+docker logs nuclei-scanner
 
-# Build functional test binary
-make build-test
+# View discovery status
+cat /volume2/docker/nuclei/discovery/status.json
 ```
 
-### Development Tools
+### Manual Scanning
 ```bash
-# Update all JavaScript/TypeScript bindings
-make jsupdate-all
+# Run a full scan with Home Assistant updates
+docker exec nuclei-scanner /home/nuclei/scripts/scan-with-ha-modern.sh
 
-# Generate documentation
-make docs
+# Scan a specific host
+docker exec nuclei-scanner /home/nuclei/scripts/profile-new-host-enhanced.sh 192.168.10.100 default
 
-# Generate template documentation
-make syntax-docs
-
-# Generate DSL function documentation
-make dsl-docs
+# Force discovery scan
+docker exec nuclei-scanner pkill -USR1 -f simple-discovery
 ```
 
-### Testing
+### Service Management
 ```bash
-# Run unit tests
-make test
+# Enable systemd services
+systemctl enable nuclei-scan.service monitor.service
 
-# Run integration tests
-make integration
+# Start monitoring service
+systemctl start monitor.service
 
-# Run functional tests
-make functional
-
-# Validate templates
-make template-validate
+# Check service status
+systemctl status nuclei-scan.service
 ```
 
-### Docker Commands
-```bash
-# Build Docker image
-docker build -t nuclei .
+## Environment Variables
 
-# Run nuclei in Docker
-docker run projectdiscovery/nuclei:latest -target example.com
+| Variable | Description | Default |
+|----------|-------------|---------|
+| NETWORK_DISCOVERY_ENABLED | Enable/disable network discovery | true |
+| DAILY_SCAN_ENABLED | Enable/disable daily scans | true |
+| DISCOVERY_INTERVAL | Interval between discovery scans (seconds) | 300 |
+| HOME_ASSISTANT_API_TOKEN | Token for Home Assistant integration | required |
+| PDCP_API_KEY | ProjectDiscovery API key for AI templates | optional |
+| OLLAMA_API | URL for local LLM integration | optional |
 
-# Scan network with Docker
-docker run projectdiscovery/nuclei:latest -target 192.168.1.0/24
-```
+## Docker Configuration
 
-### Network Scanning
-```bash
-# Scan single host
-./bin/nuclei -target example.com
-
-# Scan network subnet
-./bin/nuclei -target 192.168.1.0/24
-
-# Scan with specific templates
-./bin/nuclei -target example.com -t http/vulnerabilities/
-
-# Scan with severity filter
-./bin/nuclei -target example.com -severity high,critical
-```
-
-## Docker Configuration for Synology NAS
-
-The project includes a Dockerfile that creates an Alpine-based container with:
-- Nuclei binary
-- Required dependencies (bind-tools, chromium, ca-certificates)
-- Minimal attack surface
-
-### Multi-VLAN Home Network Configuration
-
-For running on a Synology NAS (192.168.10.163) to scan multiple VLANs:
+The enhanced system uses a simpler host networking configuration instead of custom VLANs to simplify deployment:
 
 ```yaml
-# docker-compose.yml for multi-VLAN scanning deployment
-version: '3'
+# docker-compose.yml for network discovery
+version: '3.8'
+
 services:
   nuclei:
-    image: projectdiscovery/nuclei:latest
+    build: .
     container_name: nuclei-scanner
-    cap_add:
-      - NET_ADMIN  # Required for multiple VLANs
-    privileged: true  # May be needed for VLAN access
     volumes:
-      - ./templates:/home/nuclei/nuclei-templates
       - ./results:/home/nuclei/results
-      - ./config:/home/nuclei/.config/nuclei
       - ./scripts:/home/nuclei/scripts
+      - ./entrypoint.sh:/home/nuclei/entrypoint.sh:ro
+      - ./logs:/home/nuclei/logs
+      - ./discovery:/home/nuclei/discovery
     environment:
       - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
+      - PDCP_API_KEY=${PDCP_API_KEY}
       - OLLAMA_API=http://192.168.10.249:11434/v1
-    networks:
-      vlan_default:
-        ipv4_address: 192.168.10.200
-      vlan_iot:
-        ipv4_address: 192.168.14.200
-      vlan_guest:
-        ipv4_address: 192.168.5.200
-      vlan_clients:
-        ipv4_address: 192.168.6.200
+      - NETWORK_DISCOVERY_ENABLED=true
+      - DAILY_SCAN_ENABLED=true
+      - DISCOVERY_INTERVAL=300
+    network_mode: host
+    cap_add:
+      - NET_ADMIN  # Required for network operations
     restart: unless-stopped
-    command: /home/nuclei/scripts/multi-vlan-scan.sh
-
-networks:
-  vlan_default:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.1
-    ipam:
-      config:
-        - subnet: 192.168.10.0/24
-          gateway: 192.168.10.1
-  vlan_iot:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.2
-    ipam:
-      config:
-        - subnet: 192.168.14.0/24
-          gateway: 192.168.14.1
-  vlan_guest:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.3
-    ipam:
-      config:
-        - subnet: 192.168.5.0/24
-          gateway: 192.168.5.1
-  vlan_clients:
-    driver: macvlan
-    driver_opts:
-      parent: eth0.4
-    ipam:
-      config:
-        - subnet: 192.168.6.0/24
-          gateway: 192.168.6.1
+    healthcheck:
+      test: ["CMD", "sh", "-c", "pgrep -f network-discovery || exit 1"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    command: sh /home/nuclei/entrypoint.sh
 ```
 
-### VLAN Network Segments
+## VLAN Network Segments
+
+The discovery system scans these network segments:
 
 - **Default VLAN 1**: 192.168.10.0/24 - Core devices, servers, management
 - **IOT VLAN 2**: 192.168.14.0/24 - IoT devices
 - **Guest VLAN 3**: 192.168.5.0/24 - Guest access
-- **Clients VLAN 4**: 192.168.6.0/24 - Client devices  
-- **ISOLATED VLAN 40**: 192.168.40.0/28 - Corporate devices (isolated)
-- **VPN**: 192.168.3.0/24 - VPN clients
-
-### Critical Infrastructure Targets
-
-```bash
-# Create target list file: critical-hosts.txt
-cat > critical-hosts.txt << EOF
-# Network Infrastructure
-192.168.10.1    # UDM PRO (Main Router/Firewall)
-192.168.10.156  # Ubiquiti AP 1
-192.168.10.50   # Ubiquiti AP 2
-192.168.10.7    # Ubiquiti AP 3
-192.168.10.130  # Ubiquiti AP 4
-
-# Servers
-192.168.10.249  # Think Tank (Ubuntu Dev Server - Docker/Ollama)
-192.168.10.251  # RBHome Ubuntu (Media Server - Plex/Sonarr/Radarr)
-192.168.10.89   # Home Assistant (Raspberry Pi)
-192.168.10.163  # NAS1 (Synology - Nuclei Host)
-EOF
-```
-
-### Multi-VLAN Scanning Script
-
-```bash
-#!/bin/bash
-# multi-vlan-scan.sh - Comprehensive multi-VLAN scanning script
-
-SCAN_DATE=$(date +%Y%m%d-%H%M%S)
-RESULTS_DIR="/home/nuclei/results/${SCAN_DATE}"
-mkdir -p "$RESULTS_DIR"
-
-# Function to update Home Assistant
-update_home_assistant() {
-    curl -X POST \
-      -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"state\": \"$1\", \"attributes\": {\"last_scan\": \"${SCAN_DATE}\", \"status\": \"$2\", \"findings\": $3}}" \
-      http://192.168.10.89:8123/api/states/sensor.nuclei_scanner
-}
-
-# Start scan notification
-update_home_assistant "scanning" "Running multi-VLAN scan" 0
-
-# Scan each VLAN
-VLANS=("192.168.10.0/24:default" "192.168.14.0/24:iot" "192.168.5.0/24:guest" "192.168.6.0/24:clients")
-
-for vlan in "${VLANS[@]}"; do
-    IFS=':' read -r subnet name <<< "$vlan"
-    echo "Scanning $name VLAN: $subnet"
-    
-    nuclei -target "$subnet" \
-           -o "$RESULTS_DIR/scan-$name.json" \
-           -json \
-           -severity medium,high,critical \
-           -tags network,cve,router,iot,exposed-panels,default-logins \
-           -stats-json \
-           -si 30 \
-           -exclude-hosts "192.168.10.163" # Exclude self (NAS)
-done
-
-# Scan critical infrastructure with enhanced checks
-nuclei -list /home/nuclei/critical-hosts.txt \
-       -o "$RESULTS_DIR/critical-infrastructure.json" \
-       -json \
-       -severity low,medium,high,critical \
-       -t network/ -t ssl/ -t exposed-panels/ -t default-logins/ \
-       -stats-json
-
-# Compile results and check for findings
-FINDINGS=$(jq -s '[.[] | select(.info.severity == "critical" or .info.severity == "high")] | length' "$RESULTS_DIR"/*.json 2>/dev/null || echo 0)
-
-if [ "$FINDINGS" -gt 0 ]; then
-    update_home_assistant "alert" "Found $FINDINGS vulnerabilities" "$FINDINGS"
-    # Send notification to Home Assistant
-    curl -X POST \
-      -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
-      -H "Content-Type: application/json" \
-      -d "{\"message\": \"Nuclei scan completed: $FINDINGS high/critical vulnerabilities found\", \"title\": \"Security Alert\"}" \
-      http://192.168.10.89:8123/api/services/notify/notify
-else
-    update_home_assistant "ok" "No vulnerabilities found" 0
-fi
-
-# Generate summary report
-echo "Scan completed at $SCAN_DATE" > "$RESULTS_DIR/summary.txt"
-echo "Total high/critical findings: $FINDINGS" >> "$RESULTS_DIR/summary.txt"
-cat "$RESULTS_DIR"/*.json | jq -r '.info.severity' | sort | uniq -c >> "$RESULTS_DIR/summary.txt"
-```
-
-## AI Template Generation with Nuclei
-
-Nuclei includes AI-powered template generation using the ProjectDiscovery Cloud Platform API:
-
-```bash
-# Generate and run a template using AI
-nuclei -ai "detect exposed Synology NAS admin panels" -target 192.168.10.0/24
-
-# Generate template without running (no targets)
-nuclei -ai "find default credentials in IoT devices"
-
-# Examples of AI prompts for home network security
-nuclei -ai "detect exposed home automation systems" -target 192.168.14.0/24
-nuclei -ai "find misconfigured routers with default credentials" -target 192.168.10.1
-nuclei -ai "identify vulnerable media servers" -target 192.168.10.251
-```
-
-### Important Notes:
-- Requires PDCP (ProjectDiscovery Cloud Platform) API key
-- Configure with: `nuclei -auth` or set `PDCP_API_KEY` environment variable
-- Free tier available at https://cloud.projectdiscovery.io/
-- Generated templates are saved to `~/nuclei-templates/pdcp/`
-- View templates online at `https://cloud.projectdiscovery.io/templates/{template_id}`
-
-### Local LLM Integration (Future Enhancement)
-While Nuclei doesn't currently support local LLM integration, you could potentially:
-1. Create a local API proxy that mimics the PDCP API endpoint
-2. Route requests to your Ollama instance on Think Tank (192.168.10.249)
-3. Generate templates locally without cloud dependency
+- **Clients VLAN 4**: 192.168.6.0/24 - Client devices
 
 ## Home Assistant Integration
 
-Create sensors and automations in Home Assistant to monitor Nuclei scans:
+The system creates the following entities:
 
-```yaml
-# configuration.yaml
-sensor:
-  - platform: template
-    sensors:
-      nuclei_scanner:
-        friendly_name: "Nuclei Security Scanner"
-        value_template: "{{ states('input_text.nuclei_status') }}"
-        attribute_templates:
-          last_scan: "{{ states('input_datetime.nuclei_last_scan') }}"
-          findings_count: "{{ states('input_number.nuclei_findings') | int }}"
-          critical_count: "{{ states('input_number.nuclei_critical') | int }}"
-          high_count: "{{ states('input_number.nuclei_high') | int }}"
+| Entity | Description |
+|--------|-------------|
+| sensor.nuclei_scanner | Main scanner status and findings |
+| sensor.nuclei_discovery | Network discovery status and device counts |
+| sensor.nuclei_vulnerabilities | Security vulnerability tracking |
+| sensor.nuclei_scanner_system | Container and system status |
+| sensor.nuclei_new_device_[IP] | Created for each new device found |
 
-input_text:
-  nuclei_status:
-    name: Nuclei Status
-    initial: idle
+## Important Files and Directories
 
-input_datetime:
-  nuclei_last_scan:
-    name: Last Nuclei Scan
-    has_date: true
-    has_time: true
+- **Scripts**: `/volume2/docker/nuclei/scripts/`
+- **Logs**: `/volume2/docker/nuclei/logs/`
+- **Discovery Database**: `/volume2/docker/nuclei/discovery/discovery.db`
+- **Status File**: `/volume2/docker/nuclei/discovery/status.json`
+- **Vulnerability File**: `/volume2/docker/nuclei/discovery/vulnerabilities.json`
+- **Scan Results**: `/volume2/docker/nuclei/results/[date-timestamp]/`
 
-input_number:
-  nuclei_findings:
-    name: Nuclei Findings
-    min: 0
-    max: 999
-    step: 1
-  nuclei_critical:
-    name: Critical Findings
-    min: 0
-    max: 999
-    step: 1
-  nuclei_high:
-    name: High Findings
-    min: 0
-    max: 999
-    step: 1
+## Diagnostics
 
-automation:
-  - alias: "Nuclei Daily Scan"
-    trigger:
-      - platform: time
-        at: "03:00:00"
-    action:
-      - service: shell_command.run_nuclei_scan
-      
-  - alias: "Nuclei Alert Notification"
-    trigger:
-      - platform: state
-        entity_id: sensor.nuclei_scanner
-        to: "alert"
-    action:
-      - service: notify.notify
-        data:
-          title: "Security Alert"
-          message: "Nuclei found {{ state_attr('sensor.nuclei_scanner', 'findings_count') }} vulnerabilities!"
+For diagnosing issues, check:
 
-shell_command:
-  run_nuclei_scan: 'docker exec nuclei-scanner /home/nuclei/scripts/multi-vlan-scan.sh'
-```
+1. **Container logs**:
+   ```bash
+   docker logs nuclei-scanner
+   ```
 
-### Lovelace Dashboard Card
+2. **Service status**:
+   ```bash
+   systemctl status monitor.service
+   ```
 
-```yaml
-type: custom:vertical-stack-in-card
-title: Network Security Scanner
-cards:
-  - type: custom:button-card
-    entity: sensor.nuclei_scanner
-    show_state: true
-    show_icon: true
-    icon: mdi:shield-search
-    size: 40px
-    state:
-      - value: "scanning"
-        color: blue
-        icon: mdi:shield-sync
-      - value: "alert"
-        color: red
-        icon: mdi:shield-alert
-      - value: "ok"
-        color: green
-        icon: mdi:shield-check
-  - type: entities
-    entities:
-      - entity: sensor.nuclei_scanner
-        type: attribute
-        attribute: last_scan
-        name: Last Scan
-      - entity: sensor.nuclei_scanner
-        type: attribute
-        attribute: findings_count
-        name: Total Findings
-      - entity: sensor.nuclei_scanner
-        type: attribute
-        attribute: critical_count
-        name: Critical
-      - entity: sensor.nuclei_scanner
-        type: attribute
-        attribute: high_count
-        name: High
-  - type: button
-    tap_action:
-      action: call-service
-      service: shell_command.run_nuclei_scan
-    name: Run Scan Now
-    icon: mdi:play
-```
+3. **Discovery logs**:
+   ```bash
+   cat /volume2/docker/nuclei/logs/discovery.log
+   ```
 
-## Key Environment Variables
+4. **Home Assistant entities**:
+   - Check `sensor.nuclei_discovery` in Home Assistant
+   - Verify `sensor.nuclei_vulnerabilities` has data
 
-- `NUCLEI_SIGNATURE_PRIVATE_KEY`: For signing templates
-- `NUCLEI_CONFIG_DIR`: Configuration directory path
-- `NUCLEI_TEMPLATES_DIR`: Templates directory path
+## Maintenance Tasks
 
-## Template Structure
-
-Templates follow this basic structure:
-```yaml
-id: template-id
-info:
-  name: Template Name
-  author: author
-  severity: high
-  tags: cve,apache
-
-requests:
-  - method: GET
-    path:
-      - "{{BaseURL}}/vulnerable-path"
-    matchers:
-      - type: word
-        words:
-          - "vulnerable string"
-```
-
-## Binary Locations
-
-- Main binary: `./bin/nuclei`
-- Development tools: `./bin/` (bindgen, tsgen, docgen, etc.)
-- Template signer: `./bin/template-signer`
-
-## Important Files
-
-- Configuration: `~/.config/nuclei/config.yaml`
-- Templates: `~/nuclei-templates/`
-- Issue tracker config: `cmd/nuclei/issue-tracker-config.yaml`
-- CLI flags: See `nuclei -h` for full list
-
-## Recommended Templates for Home Network Security
-
-### Critical Infrastructure Scanning
-```bash
-# Scan Ubiquiti devices
-nuclei -t exposed-panels/unifi/ -t default-logins/unifi/ -target 192.168.10.1,192.168.10.156,192.168.10.50,192.168.10.7,192.168.10.130
-
-# Scan Synology NAS
-nuclei -t exposed-panels/synology/ -t cves/synology/ -target 192.168.10.163
-
-# Scan media servers
-nuclei -t exposed-panels/plex/ -t exposed-panels/jellyfin/ -target 192.168.10.251
-
-# Scan IoT devices
-nuclei -t iot/ -t default-logins/ -target 192.168.14.0/24
-```
-
-### Security Best Practices
-
-1. **Regular Scanning Schedule**:
-   - Critical infrastructure: Daily
-   - IoT VLAN: Weekly
-   - Guest VLAN: After each new device connects
-   - Full network: Monthly
-
-2. **Template Updates**:
+1. **Template Updates**:
    - Update templates regularly: `nuclei -ut`
    - Monitor for new CVEs relevant to your devices
 
-3. **Results Management**:
-   - Store results in structured format (JSON)
-   - Archive historical data for trend analysis
-   - Integrate with SIEM or logging system
+2. **Vulnerability Management**:
+   - Review `/volume2/docker/nuclei/discovery/vulnerabilities.json`
+   - Address critical and high severity issues promptly
+   - Track remediation progress
 
-4. **VLAN Security**:
-   - Ensure proper firewall rules between VLANs
-   - Monitor for cross-VLAN communication attempts
-   - Regularly audit VLAN configurations
+3. **Database Cleanup**:
+   - Check `/volume2/docker/nuclei/discovery/discovery.db` for size
+   - Archive old scan results periodically
+   - Maintain a historical record of network changes
 
-5. **Custom Templates**:
-   - Create custom templates for your specific devices
-   - Focus on configuration misconfigurations
-   - Check for exposed internal services
+## Verification Commands
+
+Run these commands to validate system operation:
+
+```bash
+# 1. Check if discovery is running
+docker exec nuclei-scanner ps -ef | grep discovery
+
+# 2. Check hosts discovered
+docker exec nuclei-scanner wc -l /home/nuclei/discovery/discovery.db
+
+# 3. Check Home Assistant status
+curl -s -H "Authorization: Bearer ${HOME_ASSISTANT_API_TOKEN}" \
+     http://192.168.10.89:8123/api/states/sensor.nuclei_discovery | jq
+
+# 4. Review vulnerability statistics
+cat /volume2/docker/nuclei/discovery/vulnerabilities.json
+```

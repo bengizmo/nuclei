@@ -9,12 +9,24 @@ services:
       - ./results:/home/nuclei/results
       - ./scripts:/home/nuclei/scripts
       - ./critical-hosts.txt:/home/nuclei/critical-hosts.txt:ro
+      - ./entrypoint.sh:/home/nuclei/entrypoint.sh:ro
+      - ./logs:/home/nuclei/logs
+      - ./discovery:/home/nuclei/discovery
     environment:
       - HOME_ASSISTANT_API_TOKEN=${HOME_ASSISTANT_API_TOKEN}
       - PDCP_API_KEY=${PDCP_API_KEY}
       - OLLAMA_API=http://192.168.10.249:11434/v1
+      - NETWORK_DISCOVERY_ENABLED=true
+      - DAILY_SCAN_ENABLED=true
+      - DISCOVERY_INTERVAL=300
     network_mode: host
     cap_add:
       - NET_ADMIN  # Required for network operations
     restart: unless-stopped
-    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "sh", "-c", "pgrep -f network-discovery || exit 1"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 60s
+    command: sh /home/nuclei/entrypoint.sh
