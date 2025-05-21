@@ -1,0 +1,21 @@
+# Simplest possible Home Assistant configuration for Nuclei scanning
+# Just add this to your configuration.yaml
+
+# Shell command to run the direct script
+shell_command:
+  run_nuclei_scan: "/config/nuclei/trigger-scan-direct.sh"
+
+# Button to use in the UI
+input_button:
+  run_security_scan:
+    name: Run Security Scan
+    icon: mdi:shield-search
+
+# Simple automation to link button to shell command
+automation:
+  - alias: "Run Security Scan When Button Pressed"
+    trigger:
+      - platform: state
+        entity_id: input_button.run_security_scan
+    action:
+      - service: shell_command.run_nuclei_scan
