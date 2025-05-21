@@ -1,0 +1,55 @@
+# Simple and reliable Nuclei scan trigger system for Home Assistant
+# Add this to your configuration.yaml or create separate includes
+
+# 1. Shell command to run the scan directly on the NAS
+shell_command:
+  run_nuclei_scan: >-
+    ssh ben@192.168.10.163 "docker exec nuclei-scanner /home/nuclei/scripts/scan-with-ha-robust.sh"
+
+# 2. Script that runs the scan and handles UI updates
+script:
+  run_security_scan:
+    alias: "Run Security Scan"
+    icon: mdi:shield-search
+    sequence:
+      # First update status to scanning
+      - service: rest_command.update_scanner_status
+        data:
+          status: scanning
+      
+      # Run the actual scan via SSH
+      - service: shell_command.run_nuclei_scan
+      
+      # Show a notification
+      - service: persistent_notification.create
+        data:
+          title: "Security Scan Started"
+          message: "The security scan has been triggered. It may take 15-30 minutes to complete."
+          notification_id: "security_scan"
+
+# 3. REST command to update the scanner status
+rest_command:
+  update_scanner_status:
+    url: http://192.168.10.89:8123/api/states/sensor.nuclei_scanner_status
+    method: POST
+    headers:
+      Authorization: !secret nuclei_scanner_token
+      Content-Type: application/json
+    payload: >-
+      {"state": "{{ status }}", "attributes": {"friendly_name": "Scanner Status", "icon": "mdi:shield-search"}}
+
+# 4. Button entity to trigger the scan
+input_button:
+  run_security_scan:
+    name: Run Security Scan
+    icon: mdi:shield-search
+
+# 5. Automation to link the button to the script
+automation:
+  - alias: "Trigger Security Scan When Button Pressed"
+    description: "Run a network security scan when the button is pressed"
+    trigger:
+      - platform: state
+        entity_id: input_button.run_security_scan
+    action:
+      - service: script.run_security_scan
