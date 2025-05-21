@@ -1,0 +1,110 @@
+type: custom:stack-in-card
+cards:
+  - type: custom:mushroom-template-card
+    entity: sensor.nuclei_scanner_status
+    primary: Nuclei Security Scanner
+    secondary: "{{ states('sensor.nuclei_scanner_summary') | truncate(80) }}"
+    icon: mdi:shield-search
+    icon_color: >-
+      {% if is_state(entity, 'alert') %}
+        red
+      {% elif is_state(entity, 'scanning') %}
+        blue
+      {% else %}
+        green
+      {% endif %}
+    tap_action:
+      action: more-info
+      entity: sensor.nuclei_scanner_summary
+  
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: template
+        entity: sensor.nuclei_scanner_findings
+        content: "Vulns: {{ states(entity) }}"
+        icon: mdi:bug-outline
+        icon_color: >-
+          {% if states(entity) | int > 10 %}
+            red
+          {% elif states(entity) | int > 5 %}
+            orange
+          {% elif states(entity) | int > 0 %}
+            yellow
+          {% else %}
+            green
+          {% endif %}
+        tap_action:
+          action: more-info
+      
+      - type: template
+        entity: sensor.nuclei_scanner_hosts
+        content: "Hosts: {{ states(entity) }}"
+        icon: mdi:server-network
+        icon_color: >-
+          {% if states(entity) | int > 0 %}
+            blue
+          {% else %}
+            grey
+          {% endif %}
+        tap_action:
+          action: more-info
+      
+      - type: template
+        entity: sensor.nuclei_scanner_last_scan
+        content: "{{ as_timestamp(states(entity)) | timestamp_custom('%I:%M %p') }}"
+        icon: mdi:clock-outline
+        icon_color: >-
+          {% set hours_diff = ((now().timestamp() - as_timestamp(states(entity))) / 3600) | int %}
+          {% if hours_diff > 24 %}
+            red
+          {% elif hours_diff > 12 %}
+            orange
+          {% else %}
+            green
+          {% endif %}
+        tap_action:
+          action: more-info
+    
+    alignment: end
+  
+  - type: custom:mushroom-template-card
+    entity: sensor.nuclei_scanner_status
+    layout: vertical
+    primary: null
+    secondary: >-
+      Last scan: {{ as_timestamp(states('sensor.nuclei_scanner_last_scan')) | timestamp_custom('%Y-%m-%d %I:%M %p') }}
+    fill_container: false
+    multiline_secondary: true
+    icon_color: >-
+      {% if is_state(entity, 'alert') %}
+        red
+      {% elif is_state(entity, 'scanning') %}
+        blue
+      {% else %}
+        green
+      {% endif %}
+    picture: null
+    tap_action:
+      action: toggle
+      entity: switch.run_security_scan
+    hold_action:
+      action: more-info
+      entity: sensor.nuclei_scanner
+  
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: entity
+        entity: switch.run_security_scan
+        icon_color: blue
+        name: Run Scan
+        content_info: none
+        use_entity_picture: false
+      
+      - type: entity
+        entity: input_boolean.automated_security_scans
+        icon_color: green
+        name: Auto Scans
+        content_info: none
+        use_entity_picture: false
+    
+    alignment: center
