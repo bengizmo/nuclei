@@ -289,6 +289,16 @@ cat > "$RESULTS_DIR/status.json" <<EOF
 }
 EOF
 
+# Check for critical vulnerabilities and send email alert if needed
+if [ "$CRITICAL" -gt 0 ]; then
+    log "Critical vulnerabilities found ($CRITICAL), triggering email alert"
+    if [ -x "/home/nuclei/scripts/email-notifications.sh" ]; then
+        /home/nuclei/scripts/email-notifications.sh check-critical &
+    else
+        log "WARNING: Email notification script not found"
+    fi
+fi
+
 echo "Scan completed successfully. Status: $STATUS"
 echo "Findings: $FINDINGS (Critical: $CRITICAL, High: $HIGH)"
 echo "Hosts scanned: $HOSTS_SCANNED"

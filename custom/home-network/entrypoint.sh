@@ -188,6 +188,40 @@ if [ "${MULTIPLE_DAILY_SCANS}" = "true" ]; then
     notify_ha "Multiple daily scans enabled (3:00 AM and 3:00 PM)"
 fi
 
+# Set up weekly email summary (Sunday at 5:00 AM)
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up weekly email summary..." | tee -a /home/nuclei/logs/container.log
+
+(
+    while true; do
+        # Get current day and time
+        DAY=$(date +%u)  # 1=Monday, 7=Sunday
+        HOUR=$(date +%H)
+        MIN=$(date +%M)
+        
+        # If it's Sunday (7) at 5:00 AM, send weekly summary
+        if [ "$DAY" = "7" ] && [ "$HOUR" = "05" ] && [ "$MIN" = "00" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Sending weekly email summary..." | tee -a /home/nuclei/logs/weekly-email.log
+            
+            # Send weekly summary
+            if [ -x "/home/nuclei/scripts/email-notifications.sh" ]; then
+                /home/nuclei/scripts/email-notifications.sh weekly-summary >> /home/nuclei/logs/weekly-email.log 2>&1
+            else
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Email notification script not found" | tee -a /home/nuclei/logs/weekly-email.log
+            fi
+            
+            # Wait until it's not 5:00 AM anymore to avoid multiple executions
+            while [ "$(date +%H)" = "05" ] && [ "$(date +%M)" = "00" ]; do
+                sleep 30
+            done
+        fi
+        
+        # Check every minute
+        sleep 60
+    done
+) &
+
+notify_ha "Weekly email summary scheduled for Sundays at 5:00 AM"
+
 # Keep container running
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Entrypoint completed, container running..." | tee -a /home/nuclei/logs/container.log
 
