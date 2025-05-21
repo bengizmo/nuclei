@@ -1,0 +1,95 @@
+# Home Assistant configuration for Nuclei Scanner manual trigger
+# This adds a button to Home Assistant that will trigger a security scan
+
+# 1. REST Command to create trigger file on NAS
+rest_command:
+  trigger_nuclei_scan:
+    url: http://192.168.10.163:8123/api/webhook/nuclei_manual_scan
+    method: POST
+    payload: '{"action": "start_scan", "source": "home_assistant_button", "timestamp": "{{ now().isoformat() }}"}'
+    content_type: 'application/json'
+    verify_ssl: false
+
+# 2. Button for the Lovelace UI
+button:
+  - platform: template
+    buttons:
+      run_security_scan:
+        friendly_name: "Run Network Security Scan"
+        icon_template: "mdi:shield-search"
+        press:
+          service: script.trigger_security_scan
+
+# 3. Script that triggers the scan and provides feedback
+script:
+  trigger_security_scan:
+    alias: "Run Security Scan"
+    icon: mdi:shield-search
+    sequence:
+      # Set the scanner status to show scanning has started
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.security_scan_running
+      
+      # Update the status entity
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.nuclei_scanner_status
+        data:
+          state: "scanning"
+      
+      # Call the webhook to trigger the scan
+      - service: rest_command.trigger_nuclei_scan
+        data: {}
+      
+      # Show notification that scan was triggered
+      - service: persistent_notification.create
+        data:
+          title: "Security Scan Triggered"
+          message: "The network security scan has been started. You will be notified when it completes."
+          notification_id: "security_scan_started"
+      
+      # Send mobile notification
+      - service: notify.mobile_app
+        data:
+          title: "Security Scan Started"
+          message: "Network security scan has been triggered. This may take 15-30 minutes to complete."
+          data:
+            tag: security_scan
+            color: "#ff9c27"
+            sticky: false
+            priority: high
+
+# 4. Helper entity to track scan status
+input_boolean:
+  security_scan_running:
+    name: Security Scan Running
+    icon: mdi:shield-search
+
+# 5. Automation to reset status when scan completes
+automation:
+  - alias: "Reset Security Scan Status When Complete"
+    trigger:
+      platform: state
+      entity_id: sensor.nuclei_scanner_status
+      from: "scanning"
+    condition:
+      - condition: state
+        entity_id: input_boolean.security_scan_running
+        state: "on"
+    action:
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.security_scan_running
+      
+      - service: persistent_notification.create
+        data:
+          title: "Security Scan Complete"
+          message: >
+            The network security scan has completed.
+            {% if states('sensor.nuclei_scanner_findings')|int > 0 %}
+            🚨 {{ states('sensor.nuclei_scanner_findings') }} vulnerabilities were found!
+            {% else %}
+            ✅ No vulnerabilities were found.
+            {% endif %}
+          notification_id: "security_scan_complete"
