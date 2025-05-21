@@ -1,0 +1,35 @@
+# Final Home Assistant Configuration for Nuclei Scanner
+# This configuration uses the correct Docker path for Synology NAS
+
+# Shell command with correct Docker path
+shell_command:
+  run_nuclei_scan: "ssh ben@192.168.10.163 '/var/packages/ContainerManager/target/usr/bin/docker exec nuclei-scanner /home/nuclei/scripts/scan-with-ha-robust.sh'"
+
+# Input button helper
+input_button:
+  run_security_scan:
+    name: Run Security Scan
+    icon: mdi:shield-search
+
+# Updated automation with proper trigger
+automation:
+  - alias: "Run Security Scan When Button Pressed"
+    description: "Triggers the Nuclei security scan when the button is pressed"
+    trigger:
+      - platform: state
+        entity_id: input_button.run_security_scan
+    condition: []
+    action:
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.nuclei_scanner_status
+        data:
+          state: scanning
+      - service: shell_command.run_nuclei_scan
+        data: {}
+      - service: persistent_notification.create
+        data:
+          title: "Security Scan Triggered"
+          message: "The network security scan has been started. This may take 15-30 minutes to complete."
+          notification_id: "security_scan_started"
+    mode: single
