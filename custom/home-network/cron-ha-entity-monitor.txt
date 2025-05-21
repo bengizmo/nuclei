@@ -1,0 +1,6 @@
+# Add this to your crontab to ensure Home Assistant entities stay restored
+# Check every 2 hours if entities exist and restore them if needed
+0 */2 * * * cd /volume1/docker/nuclei && ./auto-restore-ha-entities.sh >> /volume1/docker/nuclei/logs/ha-monitor.log 2>&1
+
+# Also check after Home Assistant restarts (check 5 minutes after even hours when HA typically restarts during updates)
+5 */2 * * * cd /volume1/docker/nuclei && ./auto-restore-ha-entities.sh >> /volume1/docker/nuclei/logs/ha-monitor.log 2>&1

@@ -8,6 +8,16 @@ RESULTS_DIR="/home/nuclei/results/${SCAN_DATE}"
 mkdir -p "$RESULTS_DIR"
 mkdir -p "$RESULTS_DIR/ports"
 mkdir -p "$RESULTS_DIR/vulnerabilities"
+mkdir -p "/home/nuclei/logs"
+
+# Update Home Assistant entities to show scanning status if integration is available
+if [ -x "/home/nuclei/scripts/ha-sensor-update.sh" ] && [ -n "${HOME_ASSISTANT_API_TOKEN}" ]; then
+    echo "Updating Home Assistant to show scanning status..."
+    /home/nuclei/scripts/ha-sensor-update.sh "scanning" "0" "0" "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" "Scan in progress..."
+else
+    # Log to a file for diagnostic purposes
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting scan - HA update skipped - Script exists: $( [ -x "/home/nuclei/scripts/ha-sensor-update.sh" ] && echo "Yes" || echo "No" ), Token exists: $( [ -n "${HOME_ASSISTANT_API_TOKEN}" ] && echo "Yes" || echo "No" )" >> "/home/nuclei/logs/ha-integration.log"
+fi
 
 # VLAN Configuration
 VLANS="10 14 5 6"
@@ -211,3 +221,31 @@ cat "$RESULTS_DIR/summary.txt"
 
 # Create symlink to latest results
 ln -sf "$RESULTS_DIR" "/home/nuclei/results/latest"
+
+# Update Home Assistant entities if possible
+if [ -x "/home/nuclei/scripts/ha-sensor-update.sh" ] && [ -n "${HOME_ASSISTANT_API_TOKEN}" ]; then
+    echo "Updating Home Assistant entities..."
+    status="idle"
+    if [ "$total_findings" -gt 0 ]; then
+        status="alert"
+    fi
+    summary="Scan complete: $port_scan_count hosts scanned, $total_findings vulnerabilities found"
+    /home/nuclei/scripts/ha-sensor-update.sh "$status" "$total_findings" "$port_scan_count" "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)" "$summary"
+else
+    echo "Home Assistant integration not available (missing script or token)"
+    # Log to a file for diagnostic purposes
+    if [ -d "/home/nuclei/logs" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] HA update skipped - Script exists: $( [ -x "/home/nuclei/scripts/ha-sensor-update.sh" ] && echo "Yes" || echo "No" ), Token exists: $( [ -n "${HOME_ASSISTANT_API_TOKEN}" ] && echo "Yes" || echo "No" )" >> "/home/nuclei/logs/ha-integration.log"
+    fi
+fi
+
+# Create status.json for easy parsing by other scripts
+cat > "$RESULTS_DIR/status.json" <<EOF
+{
+    "scan_date": "${SCAN_DATE}",
+    "iso_date": "$(date -u +%Y-%m-%dT%H:%M:%S+00:00)",
+    "status": "$( [ "$total_findings" -gt 0 ] && echo "alert" || echo "idle" )",
+    "findings": ${total_findings},
+    "hosts_scanned": ${port_scan_count}
+}
+EOF

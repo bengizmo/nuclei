@@ -107,7 +107,12 @@ if [ "${DAILY_SCAN_ENABLED}" = "true" ]; then
             # If it's 3:00 AM, run the scan
             if [ "$HOUR" = "03" ] && [ "$MIN" = "00" ]; then
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running daily scan..." | tee -a /home/nuclei/logs/daily-scan.log
-                sh /home/nuclei/scripts/scan-with-ha-modern.sh
+                # Use the new robust scan script
+                if [ -x "/home/nuclei/scripts/scan-with-ha-robust.sh" ]; then
+                    sh /home/nuclei/scripts/scan-with-ha-robust.sh
+                else
+                    sh /home/nuclei/scripts/scan-with-ha-modern.sh
+                fi
                 
                 # Wait until it's not 3:00 anymore to avoid multiple executions
                 while [ "$(date +%H)" = "03" ] && [ "$(date +%M)" = "00" ]; do
@@ -127,6 +132,61 @@ fi
 
 # Update HA entity with startup info
 update_ha_entity "running" "Container started at $(date)"
+
+# Run a scan immediately on startup if needed
+if [ "${RUN_SCAN_ON_STARTUP}" = "true" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running startup scan..." | tee -a /home/nuclei/logs/container.log
+    
+    # Run the scan in background
+    (
+        # Wait 30 seconds for container to fully initialize
+        sleep 30
+        
+        # Use robust scan script if available
+        if [ -x "/home/nuclei/scripts/scan-with-ha-robust.sh" ]; then
+            sh /home/nuclei/scripts/scan-with-ha-robust.sh
+        else
+            sh /home/nuclei/scripts/scan-with-ha-modern.sh
+        fi
+    ) &
+    
+    notify_ha "Startup scan initiated"
+fi
+
+# Set up additional scan at 15:00 (3:00 PM) for better coverage
+if [ "${MULTIPLE_DAILY_SCANS}" = "true" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up additional scan at 15:00" | tee -a /home/nuclei/logs/container.log
+    
+    # Set up additional scan
+    (
+        while true; do
+            # Get current hour and minute
+            HOUR=$(date +%H)
+            MIN=$(date +%M)
+            
+            # If it's 15:00, run the scan
+            if [ "$HOUR" = "15" ] && [ "$MIN" = "00" ]; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] Running afternoon scan..." | tee -a /home/nuclei/logs/afternoon-scan.log
+                # Use the new robust scan script
+                if [ -x "/home/nuclei/scripts/scan-with-ha-robust.sh" ]; then
+                    sh /home/nuclei/scripts/scan-with-ha-robust.sh
+                else
+                    sh /home/nuclei/scripts/scan-with-ha-modern.sh
+                fi
+                
+                # Wait until it's not 15:00 anymore to avoid multiple executions
+                while [ "$(date +%H)" = "15" ] && [ "$(date +%M)" = "00" ]; do
+                    sleep 30
+                done
+            fi
+            
+            # Check every minute
+            sleep 60
+        done
+    ) &
+    
+    notify_ha "Multiple daily scans enabled (3:00 AM and 3:00 PM)"
+fi
 
 # Keep container running
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Entrypoint completed, container running..." | tee -a /home/nuclei/logs/container.log

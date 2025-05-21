@@ -19,6 +19,8 @@ services:
       - NETWORK_DISCOVERY_ENABLED=true
       - DAILY_SCAN_ENABLED=true
       - DISCOVERY_INTERVAL=300
+      - RUN_SCAN_ON_STARTUP=true
+      - MULTIPLE_DAILY_SCANS=true
     network_mode: host
     cap_add:
       - NET_ADMIN  # Required for network operations
