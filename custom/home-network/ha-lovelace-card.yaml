@@ -1,0 +1,26 @@
+type: vertical-stack
+cards:
+  - type: entities
+    title: Network Security Scanner
+    entities:
+      - entity: sensor.nuclei_scanner
+      - entity: sensor.nuclei_scanner_status
+      - entity: sensor.nuclei_scanner_findings
+      - entity: sensor.nuclei_scanner_hosts
+      - entity: sensor.nuclei_scanner_last_scan
+    state_color: true
+  
+  - type: markdown
+    content: >-
+      ## Summary
+      {{ states('sensor.nuclei_scanner_summary') }}
+  
+  - type: button
+    tap_action:
+      action: call-service
+      service: script.run_security_scan
+    entity: button.run_security_scan
+    icon: mdi:shield-search
+    name: Run Security Scan
+    icon_height: 40px
+    show_state: false

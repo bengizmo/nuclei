@@ -1,0 +1,45 @@
+# Home Assistant configuration for Nuclei Scanner Button
+# Add this to your configuration.yaml or in a separate include file
+
+# Button entity for the Lovelace UI
+button:
+  - platform: template
+    buttons:
+      run_security_scan:
+        friendly_name: "Run Network Security Scan"
+        icon_template: "mdi:shield-search"
+        press:
+          service: script.run_security_scan
+
+# Shell command to trigger scan
+shell_command:
+  run_security_scan: "ssh ben@192.168.10.163 'docker exec nuclei-scanner /home/nuclei/scripts/scan-with-ha-robust.sh'"
+
+# Script that triggers the scan and provides feedback
+script:
+  run_security_scan:
+    alias: "Run Security Scan"
+    icon: mdi:shield-search
+    sequence:
+      # Update the status entity to show scanning
+      - service: homeassistant.update_entity
+        target:
+          entity_id: sensor.nuclei_scanner_status
+        data:
+          state: "scanning"
+      
+      # Run the actual scan
+      - service: shell_command.run_security_scan
+      
+      # Show notification that scan was triggered
+      - service: persistent_notification.create
+        data:
+          title: "Security Scan Triggered"
+          message: "The network security scan has been started. You will be notified when it completes."
+          notification_id: "security_scan_started"
+      
+      # Send mobile notification (if you have the mobile app)
+      - service: notify.notify
+        data:
+          title: "Security Scan Started"
+          message: "Network security scan has been triggered. This may take 15-30 minutes to complete."
