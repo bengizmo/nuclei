@@ -52,7 +52,7 @@ update_ha_entity() {
 handle_sigterm() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Received SIGTERM, shutting down..." | tee -a /home/nuclei/logs/container.log
     # Kill any running discovery process
-    pkill -f "network-discovery.sh" || true
+    pkill -f "network-discovery" || true
     notify_ha "Nuclei scanner service stopping"
     exit 0
 }
@@ -67,14 +67,14 @@ if [ "${NETWORK_DISCOVERY_ENABLED}" = "true" ]; then
     # Check for custom interval
     if [ -n "$DISCOVERY_INTERVAL" ]; then
         echo "Setting custom discovery interval: $DISCOVERY_INTERVAL seconds"
-        sed -i "s/SCAN_INTERVAL=300/SCAN_INTERVAL=$DISCOVERY_INTERVAL/" /home/nuclei/scripts/network-discovery.sh
+        sed -i "s/SCAN_INTERVAL=300/SCAN_INTERVAL=$DISCOVERY_INTERVAL/" /home/nuclei/scripts/network-discovery-fixed-final.sh
     fi
     
     # Launch discovery in background with restart capability
     (
         while true; do
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting/restarting network discovery process..." | tee -a /home/nuclei/logs/discovery-watchdog.log
-            sh /home/nuclei/scripts/network-discovery.sh &
+            sh /home/nuclei/scripts/network-discovery-fixed-final.sh &
             DISCOVERY_PID=$!
             
             # Wait for process to end

@@ -18,7 +18,7 @@ fi
 
 # Trigger the scan via SSH
 echo "Triggering scan on NAS..."
-ssh "${NAS_USER}@${NAS_HOST}" "cd /volume1/docker/nuclei && ./run-scan-now.sh"
+ssh "${NAS_USER}@${NAS_HOST}" "cd /volume2/docker/nuclei && ./run-scan-now.sh"
 
 echo ""
 echo "✅ Scan triggered successfully!"

@@ -139,6 +139,8 @@ The system creates the following entities:
 
 ## Important Files and Directories
 
+**Note**: The docker directory on the Synology NAS is located at `/volume2/docker/` (not `/volume1/docker/`)
+
 - **Scripts**: `/volume2/docker/nuclei/scripts/`
 - **Logs**: `/volume2/docker/nuclei/logs/`
 - **Discovery Database**: `/volume2/docker/nuclei/discovery/discovery.db`
