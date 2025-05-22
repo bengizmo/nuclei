@@ -1,6 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 # Email notification system for Nuclei scanner
 # Handles sending weekly summaries and critical vulnerability alerts
+
+# First source environment variables
+if [ -f "/home/nuclei/scripts/load-env.sh" ]; then
+    . "/home/nuclei/scripts/load-env.sh"
+else
+    echo "WARNING: load-env.sh not found, email may not work correctly"
+fi
 
 # Configuration from environment variables
 SMTP_SERVER="${SMTP_SERVER:-smtp.gmail.com}"

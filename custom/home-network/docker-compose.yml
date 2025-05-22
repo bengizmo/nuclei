@@ -21,6 +21,13 @@ services:
       - DISCOVERY_INTERVAL=300
       - RUN_SCAN_ON_STARTUP=true
       - MULTIPLE_DAILY_SCANS=true
+      # Email configuration (sourced from .env file during deployment)
+      - SMTP_SERVER=${SMTP_SERVER:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_RECIPIENT=${EMAIL_RECIPIENT}
+      - EMAIL_FROM=${EMAIL_FROM}
     network_mode: host
     cap_add:
       - NET_ADMIN  # Required for network operations

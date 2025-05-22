@@ -9,17 +9,23 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
-# Email configuration
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-SMTP_USERNAME = "ben@tealmaker.com"
-SMTP_PASSWORD = "vxcc lyyo gtsn nibc"
-EMAIL_RECIPIENT = "ben@tealmaker.com"
-EMAIL_FROM = "ben@tealmaker.com"
+# Email configuration - use environment variables for credentials
+SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USERNAME = os.environ.get("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD", "")
+EMAIL_RECIPIENT = os.environ.get("EMAIL_RECIPIENT", "")
+EMAIL_FROM = os.environ.get("EMAIL_FROM", SMTP_USERNAME)
 
 def send_email(subject, body):
     """Send an email with the given subject and body"""
     print(f"Sending email: {subject}")
+    
+    # Check for credentials
+    if not SMTP_USERNAME or not SMTP_PASSWORD or not EMAIL_RECIPIENT:
+        print("ERROR: Email credentials not set. Please set environment variables:")
+        print("SMTP_USERNAME, SMTP_PASSWORD, EMAIL_RECIPIENT")
+        return False
     
     # Create message
     message = MIMEMultipart()

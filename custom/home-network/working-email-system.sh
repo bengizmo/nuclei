@@ -24,13 +24,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 
-# Email configuration - hardcoded for reliability
-SMTP_SERVER = \"smtp.gmail.com\"
-SMTP_PORT = 587
-SMTP_USERNAME = \"ben@tealmaker.com\"
-SMTP_PASSWORD = \"vxcc lyyo gtsn nibc\"
-EMAIL_RECIPIENT = \"ben@tealmaker.com\"
-EMAIL_FROM = \"ben@tealmaker.com\"
+# Email configuration - load from environment variables
+SMTP_SERVER = os.environ.get(\"SMTP_SERVER\", \"smtp.gmail.com\")
+SMTP_PORT = int(os.environ.get(\"SMTP_PORT\", \"587\"))
+SMTP_USERNAME = os.environ.get(\"SMTP_USERNAME\", \"\")
+SMTP_PASSWORD = os.environ.get(\"SMTP_PASSWORD\", \"\")
+EMAIL_RECIPIENT = os.environ.get(\"EMAIL_RECIPIENT\", \"\")
+EMAIL_FROM = os.environ.get(\"EMAIL_FROM\", SMTP_USERNAME)
 
 # Paths
 RESULTS_DIR = \"/home/nuclei/results\"
