@@ -33,8 +33,8 @@ services:
       - NET_ADMIN  # Required for network operations
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-c", "pgrep -f network-discovery || exit 1"]
-      interval: 5m
+      test: ["CMD", "sh", "-c", "[ -f /home/nuclei/discovery/status.json ] && [ $(cat /home/nuclei/discovery/status.json | grep -o '\"circuit_breaker\":[^,}]*' | cut -d'\"' -f4) != 'open' ] && pgrep -f network-discovery"]
+      interval: 2m
       timeout: 30s
       retries: 3
       start_period: 60s

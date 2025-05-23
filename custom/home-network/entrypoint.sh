@@ -67,14 +67,14 @@ if [ "${NETWORK_DISCOVERY_ENABLED}" = "true" ]; then
     # Check for custom interval
     if [ -n "$DISCOVERY_INTERVAL" ]; then
         echo "Setting custom discovery interval: $DISCOVERY_INTERVAL seconds"
-        sed -i "s/SCAN_INTERVAL=300/SCAN_INTERVAL=$DISCOVERY_INTERVAL/" /home/nuclei/scripts/network-discovery-fixed-final.sh
+        sed -i "s/SCAN_INTERVAL=300/SCAN_INTERVAL=$DISCOVERY_INTERVAL/" /home/nuclei/scripts/network-discovery-resilient.sh
     fi
     
     # Launch discovery in background with restart capability
     (
         while true; do
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting/restarting network discovery process..." | tee -a /home/nuclei/logs/discovery-watchdog.log
-            sh /home/nuclei/scripts/network-discovery-fixed-final.sh &
+            sh /home/nuclei/scripts/network-discovery-resilient.sh &
             DISCOVERY_PID=$!
             
             # Wait for process to end
@@ -88,6 +88,11 @@ if [ "${NETWORK_DISCOVERY_ENABLED}" = "true" ]; then
     ) &
     
     notify_ha "Network discovery service started"
+    
+    # Start enhanced monitoring service
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting enhanced monitoring service..." | tee -a /home/nuclei/logs/container.log
+    (sh /home/nuclei/scripts/enhanced-monitor.sh &)
+    notify_ha "Enhanced monitoring service started"
 else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Network discovery service disabled" | tee -a /home/nuclei/logs/container.log
 fi
